@@ -564,26 +564,38 @@ function New-HTMLReport {
                 $null 
             }
             
-            # Calculate disabled percentage
-            $disabledPercentage = if ($stats.TotalMembers -gt 0) {
-                [math]::Round(($stats.DisabledMembers / $stats.TotalMembers) * 100, 1)
-            } else { 
-                0 
-            }
+            # Only include if this is a child OU (has no child OUs under it)
+            $isChildOU = -not (${script:OUStats}.Keys | Where-Object { 
+                $_ -ne $fullDN -and $_ -like "*,$fullDN"
+            })
             
-            @{
-                CurrentOU = $currentOU
-                ParentOU = $parentOU
-                FullDN = $fullDN
-                GroupCount = $stats.GroupCount
-                EnabledMembers = $stats.EnabledMembers
-                DisabledMembers = $stats.DisabledMembers
-                TotalMembers = ($stats.EnabledMembers + $stats.DisabledMembers)
-                DisabledPercentage = $disabledPercentage
-                NestedGroupCount = $stats.NestedGroupCount
-                MaxNestingDepth = $stats.MaxNestingDepth
+            if ($isChildOU) {
+                # Calculate disabled percentage
+                $disabledPercentage = if ($stats.TotalMembers -gt 0) {
+                    [math]::Round(($stats.DisabledMembers / $stats.TotalMembers) * 100, 1)
+                } else { 
+                    0 
+                }
+                
+                @{
+                    CurrentOU = $currentOU
+                    ParentOU = $parentOU
+                    FullDN = $fullDN
+                    GroupCount = $stats.GroupCount
+                    EnabledMembers = $stats.EnabledMembers
+                    DisabledMembers = $stats.DisabledMembers
+                    TotalMembers = ($stats.EnabledMembers + $stats.DisabledMembers)
+                    DisabledPercentage = $disabledPercentage
+                    NestedGroupCount = $stats.NestedGroupCount
+                    MaxNestingDepth = $stats.MaxNestingDepth
+                }
             }
-        } | Sort-Object { $_.GroupCount } -Descending
+        } | Where-Object { $_ -ne $null } | Sort-Object { $_.GroupCount } -Descending
+
+        # Calculate totals using only child OU data
+        $totalMembers = ($ouStats | Measure-Object -Property TotalMembers -Sum).Sum
+        $activeMembers = ($ouStats | Measure-Object -Property EnabledMembers -Sum).Sum
+        $disabledMembers = ($ouStats | Measure-Object -Property DisabledMembers -Sum).Sum
 
         # Format groups for template
         $formattedGroups = $Groups | Sort-Object -Unique Name | Sort-Object @{Expression={$_.TotalMembers}; Descending=$true}, Name | ForEach-Object {
@@ -638,26 +650,63 @@ function New-HTMLReport {
 
         # Create template data object
         $templateData = @{
+            # Report Metadata
+            REPORT_DATE = (Get-Date -Format "MMMM d, yyyy  •  HH:mm")
+            
+            # Group Overview
             TOTAL_GROUPS = $totalGroups
+            EMPTY_GROUPS = $emptyGroups
+            AVG_GROUPS_PER_OU = [Math]::Round(($totalGroups / ($ouStats.Count + 0.0)), 1)
+            
+            # Health Status
             AVG_HEALTH = [Math]::Round($avgHealth, 1)
             CRITICAL_GROUPS = $criticalGroups
             WARNING_GROUPS = $warningGroups
             HEALTHY_GROUPS = $healthyGroups
-            EMPTY_GROUPS = $emptyGroups
-            NO_MANAGER = $noManager
-            NO_DESCRIPTION = $noDescription
-            NESTED_GROUPS = $nestedGroups
-            NO_MANAGER_PERCENT = $noManagerPercent
-            NO_DESCRIPTION_PERCENT = $noDescriptionPercent
+            
+            # OU Statistics
+            TOTAL_OUS = $ouStats.Count
+            EMPTY_OUS = @($ouStats | Where-Object { $_.GroupCount -eq 0 }).Count
+            MAX_GROUPS_OU = ($ouStats | Measure-Object -Property GroupCount -Maximum).Maximum
+            
+            # User Distribution
             TOTAL_MEMBERS = $totalMembers
+            DISABLED_USERS = $disabledMembers
             ACTIVE_MEMBERS = $activeMembers
-            DISABLED_MEMBERS = $disabledMembers
             USER_DISTRIBUTION = @{
                 Enabled = $activeMembers
                 Disabled = $disabledMembers
             }
-            OU_STATS = $ouStats
+            
+            # Management Status
+            NO_MANAGER = $noManager
+            NO_DESCRIPTION = $noDescription
+            NO_MANAGER_PERCENT = $noManagerPercent
+            NO_DESCRIPTION_PERCENT = $noDescriptionPercent
+            
+            # Group Structure
+            NESTED_GROUPS = $nestedGroups
+            MAX_NESTING_DEPTH = ($Groups | Measure-Object -Property NestingDepth -Maximum).Maximum
+            GROUP_CATEGORIES = "Security: $totalGroups"
+            SCOPE_DISTRIBUTION = "Global: $totalGroups"
+            
+            # Age and Size Analysis
+            OLDEST_GROUP = @{
+                Name = ($Groups | Sort-Object Created | Select-Object -First 1).Name
+                Created = ($Groups | Sort-Object Created | Select-Object -First 1).Created.ToString('yyyy-MM-dd')
+            }
+            LARGEST_GROUP = @{
+                Name = ($Groups | Sort-Object TotalMembers -Descending | Select-Object -First 1).Name
+                Members = ($Groups | Sort-Object TotalMembers -Descending | Select-Object -First 1).TotalMembers
+            }
+            LARGEST_OU = @{
+                Name = ($ouStats | Sort-Object GroupCount -Descending | Select-Object -First 1).CurrentOU
+                Groups = ($ouStats | Sort-Object GroupCount -Descending | Select-Object -First 1).GroupCount
+            }
+            
+            # Full Data Sets
             GROUPS = $formattedGroups
+            OU_STATS = $ouStats
         }
 
         # Convert template data to JSON for JavaScript
@@ -692,8 +741,8 @@ function New-HTMLReport {
                     [System.Windows.MessageBoxButton]::OK,
                     [System.Windows.MessageBoxImage]::Information
                 )
-            }
-            catch {
+    }
+    catch {
                 Write-Log "Error opening reports: $_"
                 [System.Windows.MessageBox]::Show(
                     "Reports generated but could not be opened automatically.`n`nLocation: $DownloadsFolder`n`nFiles:`n- $(Split-Path $ReportFile -Leaf)`n- $(Split-Path $CSVFile -Leaf)", 
