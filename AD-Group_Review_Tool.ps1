@@ -319,7 +319,7 @@ function Get-GroupDetails {
         [int]$totalGroups = 0
         
         # Create hashtable to store OU statistics
-        ${script:OUStats} = @{}
+        $script:OUStats = @{}
         
         # First pass - count total groups and track unique groups by DN
         $uniqueGroups = @{}
@@ -338,7 +338,7 @@ function Get-GroupDetails {
             }
             
             # Initialize OU stats
-            ${script:OUStats}[$ou] = @{
+            $script:OUStats[$ou] = @{
                 GroupCount = $groups.Count
                 EnabledMembers = 0
                 DisabledMembers = 0
@@ -406,19 +406,13 @@ function Get-GroupDetails {
                             if ($users) {
                                 $userMembers = if ($users -is [array]) { $users.Count } else { 1 }
                                 
-                                # Track unique enabled and disabled users by their GUIDs
+                                # Process each user and update counts
                                 foreach ($user in @($users)) {
                                     if ($null -ne $user) {
                                         if ($user.Enabled) {
                                             $enabledMembers++
-                                            if (${script:OUUniqueUsers}[$ou].Enabled -ne $null) {
-                                                [void]${script:OUUniqueUsers}[$ou].Enabled.Add($user.ObjectGUID.ToString())
-                                            }
                                         } else {
                                             $disabledMembers++
-                                            if (${script:OUUniqueUsers}[$ou].Disabled -ne $null) {
-                                                [void]${script:OUUniqueUsers}[$ou].Disabled.Add($user.ObjectGUID.ToString())
-                                            }
                                         }
                                     }
                                 }
@@ -458,18 +452,46 @@ function Get-GroupDetails {
                     }
                     
                     # Update OU statistics for nested groups - ensure numeric operations
-                    $currentNestedCount = [int](${script:OUStats}[$ou].NestedGroupCount)
-                    ${script:OUStats}[$ou].NestedGroupCount = $currentNestedCount + $nestingDepth
-                    ${script:OUStats}[$ou].MaxNestingDepth = [Math]::Max([int](${script:OUStats}[$ou].MaxNestingDepth), $nestingDepth)
+                    $currentNestedCount = [int]($script:OUStats[$ou].NestedGroupCount)
+                    $script:OUStats[$ou].NestedGroupCount = $currentNestedCount + $nestingDepth
+                    $script:OUStats[$ou].MaxNestingDepth = [Math]::Max([int]($script:OUStats[$ou].MaxNestingDepth), $nestingDepth)
                     
-                    # Update OU statistics with unique user counts
-                    if (${script:OUUniqueUsers}[$ou].Enabled -ne $null) {
-                        ${script:OUStats}[$ou].EnabledMembers = ${script:OUUniqueUsers}[$ou].Enabled.Count
+                    # Update OU statistics with user counts
+                    try {
+                        # Get all users in this OU
+                        $ouUsers = Get-ADUser -LDAPFilter "(memberOf=$($group.DistinguishedName))" -Properties Enabled,ObjectGUID -ResultSetSize $null -ErrorAction Stop
+                        if ($ouUsers) {
+                            # Initialize HashSets for this OU if they don't exist
+                            if (-not $script:OUStats[$ou].EnabledUserGuids) {
+                                $script:OUStats[$ou].EnabledUserGuids = New-Object System.Collections.Generic.HashSet[string]
+                                $script:OUStats[$ou].DisabledUserGuids = New-Object System.Collections.Generic.HashSet[string]
+                            }
+                            
+                            # Process each user and update counts using GUIDs to ensure uniqueness
+                            foreach ($user in @($ouUsers)) {
+                                if ($null -ne $user) {
+                                    if ($user.Enabled) {
+                                        [void]$script:OUStats[$ou].EnabledUserGuids.Add($user.ObjectGUID.ToString())
+                                    } else {
+                                        [void]$script:OUStats[$ou].DisabledUserGuids.Add($user.ObjectGUID.ToString())
+                                    }
+                                }
+                            }
+                            
+                            # Update the member counts based on unique GUIDs
+                            $script:OUStats[$ou].EnabledMembers = $script:OUStats[$ou].EnabledUserGuids.Count
+                            $script:OUStats[$ou].DisabledMembers = $script:OUStats[$ou].DisabledUserGuids.Count
+                            
+                            # Update total members and disabled percentage
+                            $script:OUStats[$ou].TotalMembers = $script:OUStats[$ou].EnabledMembers + $script:OUStats[$ou].DisabledMembers
+                            if ($script:OUStats[$ou].TotalMembers -gt 0) {
+                                $script:OUStats[$ou].DisabledPercentage = [math]::Round(($script:OUStats[$ou].DisabledMembers / $script:OUStats[$ou].TotalMembers) * 100, 1)
+                            }
+                        }
                     }
-                    if (${script:OUUniqueUsers}[$ou].Disabled -ne $null) {
-                        ${script:OUStats}[$ou].DisabledMembers = ${script:OUUniqueUsers}[$ou].Disabled.Count
+                    catch {
+                        Write-Log ("Error getting users for OU " + $ou + ": " + $_) -Type Error -NoConsole
                     }
-                    ${script:OUStats}[$ou].TotalMembers = ${script:OUStats}[$ou].EnabledMembers + ${script:OUStats}[$ou].DisabledMembers
                     
                     # Convert manager CN to UPN if present
                     $managerUPN = if ($group.managedBy) {
@@ -494,6 +516,8 @@ function Get-GroupDetails {
                         Info = $group.Info
                         TotalMembers = $totalMembers
                         UserMembers = $userMembers
+                        EnabledUsers = $enabledMembers
+                        DisabledUsers = $disabledMembers
                         GroupMembers = $groupMembers
                         ComputerMembers = $computerMembers
                         Created = $group.whenCreated
@@ -650,12 +674,12 @@ function New-HTMLReport {
             Write-Log "Found largest group: $($largestGroup.Name)"
 
             # Calculate largest OU
-            $largestOU = ${script:OUStats}.GetEnumerator() | 
+            $largestOU = $script:OUStats.GetEnumerator() | 
                 Sort-Object { $_.Value.GroupCount } -Descending | 
                 Select-Object -First 1
             Write-Log "Found largest OU: $($largestOU.Key)"
 
-            $ouStats = ${script:OUStats}.GetEnumerator() | ForEach-Object {
+            $ouStats = $script:OUStats.GetEnumerator() | ForEach-Object {
                 $fullDN = $_.Key
                 $stats = $_.Value
                 Write-Log "Processing OU: $fullDN" -NoConsole
@@ -669,7 +693,7 @@ function New-HTMLReport {
                 } else { $null }
                 
                 # Check if this is a child OU
-                $isChildOU = -not (${script:OUStats}.Keys | Where-Object { 
+                $isChildOU = -not ($script:OUStats.Keys | Where-Object { 
                     $_ -ne $fullDN -and $_ -like "*,$fullDN"
                 })
                 
@@ -704,10 +728,10 @@ function New-HTMLReport {
 
         Write-Log "Step 4: Processing OU statistics..."
         try {
-            Write-Log "Processing OU statistics from ${script:OUStats}..."
-            Write-Log "Number of OUs to process: $(${script:OUStats}.Count)"
+            Write-Log "Processing OU statistics from $script:OUStats..."
+            Write-Log "Number of OUs to process: $($script:OUStats.Count)"
             
-            $ouStats = ${script:OUStats}.GetEnumerator() | ForEach-Object {
+            $ouStats = $script:OUStats.GetEnumerator() | ForEach-Object {
                 $fullDN = $_.Key
                 $stats = $_.Value
                 Write-Log "Processing OU: $fullDN" -NoConsole
@@ -721,7 +745,7 @@ function New-HTMLReport {
                 } else { $null }
                 
                 # Check if this is a child OU
-                $isChildOU = -not (${script:OUStats}.Keys | Where-Object { 
+                $isChildOU = -not ($script:OUStats.Keys | Where-Object { 
                     $_ -ne $fullDN -and $_ -like "*,$fullDN"
                 })
                 

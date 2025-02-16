@@ -1739,7 +1739,7 @@
                     <td>${escapeHtml(stat.CurrentOU)}</td>
                     <td class="parent-ou">${escapeHtml(stat.ParentOU)}</td>
                     <td class="members-cell">${stat.GroupCount}</td>
-                    <td class="members-cell">${stat.EnabledMembers} / ${stat.DisabledMembers}</td>
+                    <td class="members-cell">${stat.EnabledMembers} enabled / ${stat.DisabledMembers} disabled</td>
                     <td class="members-cell">${stat.TotalMembers}</td>
                     <td class="members-cell ${disabledClass}" data-value="${stat.DisabledPercentage}">${stat.DisabledPercentage}%</td>
                     <td class="members-cell">${stat.NestedGroupCount}</td>
@@ -1771,7 +1771,7 @@
                     <td>
                         <div class="member-stats">
                             <span class="member-stat">Total: ${group.TotalMembers}</span>
-                            <span class="member-stat">Users: ${group.UserMembers}</span>
+                            <span class="member-stat">Users: ${group.UserMembers} (${group.EnabledUsers} enabled / ${group.DisabledUsers} disabled)</span>
                             <span class="member-stat">Groups: ${group.GroupMembers}</span>
                             <span class="member-stat">Computers: ${group.ComputerMembers}</span>
                         </div>
@@ -2001,19 +2001,23 @@
                 </div>
                 <div class="metric-grid">
                     <div class="metric-item">
-                        <span class="metric-label">Active Members</span>
-                        <span class="metric-value" data-metric="ACTIVE_MEMBERS"></span>
-                        <span class="metric-percent">(<span data-metric="ACTIVE_MEMBERS_PERCENT"></span>%)</span>
+                        <span class="metric-label">Total Users</span>
+                        <span class="metric-value" data-metric="TOTAL_MEMBERS"></span>
                     </div>
                     <div class="metric-item">
-                        <span class="metric-label">Disabled Members</span>
-                        <span class="metric-value" data-metric="DISABLED_USERS"></span>
-                        <span class="metric-percent">(<span data-metric="DISABLED_MEMBERS_PERCENT"></span>%)</span>
+                        <span class="metric-label">User Status</span>
+                        <span class="metric-value">
+                            <span data-metric="ACTIVE_MEMBERS"></span> enabled /
+                            <span data-metric="DISABLED_USERS"></span> disabled
+                        </span>
                     </div>
                 </div>
                 <div class="metric-trend">
-                    <span class="trend-label">Total Members:</span>
-                    <span class="trend-value" data-metric="TOTAL_MEMBERS"></span>
+                    <span class="trend-label">Distribution:</span>
+                    <span class="trend-value">
+                        <span data-metric="ACTIVE_MEMBERS_PERCENT"></span>% enabled,
+                        <span data-metric="DISABLED_MEMBERS_PERCENT"></span>% disabled
+                    </span>
                 </div>
             </div>
 
@@ -2105,7 +2109,7 @@
                         <th class="sortable">Organizational Unit</th>
                         <th class="sortable">Parent OU</th>
                         <th class="sortable">Groups</th>
-                        <th class="sortable">Enabled/Disabled</th>
+                        <th class="sortable">Users</th>
                         <th class="sortable">Total Members</th>
                         <th class="sortable">Disabled %</th>
                         <th class="sortable">Nested Groups</th>
