@@ -417,6 +417,15 @@ function Get-GroupDetails {
                 MaxNestingDepth = 0
                 EnabledUserGuids = New-Object System.Collections.Generic.HashSet[string]
                 DisabledUserGuids = New-Object System.Collections.Generic.HashSet[string]
+                GroupCategories = @{
+                    'Security Groups' = 0
+                    'Distribution Groups' = 0
+                }
+                GroupScopes = @{
+                    'DomainLocal' = 0
+                    'Global' = 0
+                    'Universal' = 0
+                }
             }
         }
         
@@ -660,6 +669,21 @@ function Get-GroupDetails {
                         }
                         [void]$groupObj.HealthIssues.Add($nestedWarning)
                     }
+                    
+                    # Count group categories for this OU
+                    $category = if ($group.groupCategory -eq 'Security') {
+                        'Security Groups'
+                    } else {
+                        'Distribution Groups'
+                    }
+                    $script:OUStats[$ou].GroupCategories[$category]++
+                    
+                    # Count group scopes for this OU
+                    $scope = $group.groupScope.ToString()
+                    if (-not $script:OUStats[$ou].GroupScopes.ContainsKey($scope)) {
+                        $script:OUStats[$ou].GroupScopes[$scope] = 0
+                    }
+                    $script:OUStats[$ou].GroupScopes[$scope]++
                     
                     [void]$allGroups.Add($groupObj)
                 }
