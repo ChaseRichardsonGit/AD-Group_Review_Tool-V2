@@ -520,6 +520,8 @@ function Get-GroupDetails {
                                 }
                             }
                             
+
+                            
                             Start-Sleep -Milliseconds 50
                             
                             # Get group members count
