@@ -460,18 +460,9 @@ function Get-GroupDetails {
                     
                     # Update OU statistics with user counts
                     try {
-                        # Special handling for different OU types
-                        if ($ou -like "*OU=Disabled Users,*") {
-                            # Get all users directly in the Disabled Users OU
-                            $ouUsers = Get-ADUser -Filter * -SearchBase $ou -Properties Enabled,ObjectGUID -ResultSetSize $null -ErrorAction Stop
-                        } elseif ($ou -like "*OU=Users,*") {
-                            # For Users OUs, get all users directly in the OU
-                            $ouUsers = Get-ADUser -Filter * -SearchBase $ou -Properties Enabled,ObjectGUID -ResultSetSize $null -ErrorAction Stop
-                        } else {
-                            # For other OUs, get users through group membership
-                            $ouUsers = Get-ADUser -LDAPFilter "(memberOf=$($group.DistinguishedName))" -Properties Enabled,ObjectGUID -ResultSetSize $null -ErrorAction Stop
-                        }
-
+                        # Get all users directly in the OU
+                        $ouUsers = Get-ADUser -Filter * -SearchBase $ou -Properties Enabled,ObjectGUID -ResultSetSize $null -ErrorAction Stop
+                        
                         if ($ouUsers) {
                             # Process each user and update counts using GUIDs to ensure uniqueness
                             foreach ($user in @($ouUsers)) {
@@ -483,16 +474,33 @@ function Get-GroupDetails {
                                     }
                                 }
                             }
+                        }
+                        
+                        # Also get users through group membership if this is not a Users OU
+                        if ($ou -notlike "*OU=Users,*") {
+                            $groupUsers = Get-ADUser -LDAPFilter "(memberOf=$($group.DistinguishedName))" -Properties Enabled,ObjectGUID -ResultSetSize $null -ErrorAction Stop
                             
-                            # Update the member counts based on unique GUIDs
-                            $script:OUStats[$ou].EnabledMembers = $script:OUStats[$ou].EnabledUserGuids.Count
-                            $script:OUStats[$ou].DisabledMembers = $script:OUStats[$ou].DisabledUserGuids.Count
-                            
-                            # Update total members and disabled percentage
-                            $script:OUStats[$ou].TotalMembers = $script:OUStats[$ou].EnabledMembers + $script:OUStats[$ou].DisabledMembers
-                            if ($script:OUStats[$ou].TotalMembers -gt 0) {
-                                $script:OUStats[$ou].DisabledPercentage = [math]::Round(($script:OUStats[$ou].DisabledMembers / $script:OUStats[$ou].TotalMembers) * 100, 1)
+                            if ($groupUsers) {
+                                foreach ($user in @($groupUsers)) {
+                                    if ($null -ne $user) {
+                                        if ($user.Enabled) {
+                                            [void]$script:OUStats[$ou].EnabledUserGuids.Add($user.ObjectGUID.ToString())
+                                        } else {
+                                            [void]$script:OUStats[$ou].DisabledUserGuids.Add($user.ObjectGUID.ToString())
+                                        }
+                                    }
+                                }
                             }
+                        }
+                        
+                        # Update the member counts based on unique GUIDs
+                        $script:OUStats[$ou].EnabledMembers = $script:OUStats[$ou].EnabledUserGuids.Count
+                        $script:OUStats[$ou].DisabledMembers = $script:OUStats[$ou].DisabledUserGuids.Count
+                        
+                        # Update total members and disabled percentage
+                        $script:OUStats[$ou].TotalMembers = $script:OUStats[$ou].EnabledMembers + $script:OUStats[$ou].DisabledMembers
+                        if ($script:OUStats[$ou].TotalMembers -gt 0) {
+                            $script:OUStats[$ou].DisabledPercentage = [math]::Round(($script:OUStats[$ou].DisabledMembers / $script:OUStats[$ou].TotalMembers) * 100, 1)
                         }
                     }
                     catch {
