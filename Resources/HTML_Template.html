@@ -1528,6 +1528,11 @@
                 return;
             }
             
+            console.log('Template data loaded:', templateData); // Debug log
+            console.log('Group Categories value:', templateData.GROUP_CATEGORIES);
+            console.log('Scope Distribution value:', templateData.SCOPE_DISTRIBUTION);
+            console.log('Group Distribution object:', templateData.GROUP_DISTRIBUTION);
+            
             // Populate all data fields
             populateMetrics();
             populateOUStats();
@@ -1549,9 +1554,13 @@
         }
 
         function populateMetrics() {
+            console.log('Starting to populate metrics...');
+            
             // Update all metric values using template data
             document.querySelectorAll('[data-metric]').forEach(element => {
                 const metric = element.getAttribute('data-metric');
+                console.log(`Processing metric: ${metric}`);
+                
                 if (templateData[metric] !== undefined) {
                     if (metric === 'USER_DISTRIBUTION') {
                         const dist = typeof templateData[metric] === 'string' ? 
@@ -1560,16 +1569,26 @@
                     } else if (metric === 'GROUP_CATEGORIES') {
                         // Format group categories with bullet points
                         const categories = templateData[metric];
+                        console.log('Processing GROUP_CATEGORIES:', categories);
+                        console.log('Element to update:', element);
+                        
                         if (categories) {
                             element.textContent = categories;
-                            console.log('Group Categories:', categories); // Debug log
+                            console.log('Updated categories text to:', categories);
+                        } else {
+                            console.error('No group categories data found');
                         }
                     } else if (metric === 'SCOPE_DISTRIBUTION') {
                         // Format scope distribution with bullet points
                         const scopes = templateData[metric];
+                        console.log('Processing SCOPE_DISTRIBUTION:', scopes);
+                        console.log('Element to update:', element);
+                        
                         if (scopes) {
                             element.textContent = scopes;
-                            console.log('Scope Distribution:', scopes); // Debug log
+                            console.log('Updated scopes text to:', scopes);
+                        } else {
+                            console.error('No scope distribution data found');
                         }
                     } else if (metric.includes('.')) {
                         // Handle nested properties (e.g., 'OLDEST_GROUP.Name')
@@ -1580,8 +1599,19 @@
                     } else {
                         element.textContent = templateData[metric];
                     }
+                } else {
+                    console.error(`No data found for metric: ${metric}`);
                 }
             });
+
+            // Double-check the group distribution elements
+            const categoriesElement = document.getElementById('groupCategories');
+            const scopesElement = document.getElementById('groupScopes');
+            
+            console.log('Categories element:', categoriesElement);
+            console.log('Categories element current text:', categoriesElement?.textContent);
+            console.log('Scopes element:', scopesElement);
+            console.log('Scopes element current text:', scopesElement?.textContent);
 
             // Update report date
             const reportSubtitle = document.querySelector('.report-subtitle');
@@ -2145,13 +2175,17 @@
                         <div class="structure-details">
                             <span class="structure-label">Group Distribution</span>
                             <div class="structure-value" style="margin-top: 8px; font-size: 14px;">
-                                <div style="margin-bottom: 8px;">
+                                <div style="margin-bottom: 12px;">
                                     <strong>Categories:</strong>
-                                    <div data-metric="GROUP_CATEGORIES" style="margin-top: 4px; color: #4a5568;"></div>
+                                    <div style="margin-top: 4px; color: #4a5568;">
+                                        <span data-metric="GROUP_CATEGORIES"></span>
+                                    </div>
                                 </div>
                                 <div>
                                     <strong>Scopes:</strong>
-                                    <div data-metric="SCOPE_DISTRIBUTION" style="margin-top: 4px; color: #4a5568;"></div>
+                                    <div style="margin-top: 4px; color: #4a5568;">
+                                        <span data-metric="SCOPE_DISTRIBUTION"></span>
+                                    </div>
                                 </div>
                             </div>
                         </div>

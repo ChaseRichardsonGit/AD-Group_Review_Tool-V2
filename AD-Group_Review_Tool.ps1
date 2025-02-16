@@ -423,18 +423,30 @@ function Get-GroupDetails {
         Write-Log "Total unique groups to process: $totalGroups"
         
         # Format group category and scope distribution strings with counts
+        Write-Log "Starting to format group categories and scopes..."
+        Write-Log "Raw group categories data: $($groupCategories | ConvertTo-Json)"
+        Write-Log "Raw group scopes data: $($groupScopes | ConvertTo-Json)"
+
         $categoryStr = ($groupCategories.GetEnumerator() | Where-Object { $_.Value -gt 0 } | Sort-Object Name | ForEach-Object { 
             "$($_.Value) $($_.Key)"
         }) -join ' • '
-        
-        Write-Log "Group Categories: $categoryStr"
-        
+
+        Write-Log "Formatted group categories string: $categoryStr"
+
         $scopeStr = ($groupScopes.GetEnumerator() | Where-Object { $_.Value -gt 0 } | Sort-Object Name | ForEach-Object { 
             "$($_.Value) $($_.Key)"
         }) -join ' • '
-        
-        Write-Log "Group Scopes: $scopeStr"
-        
+
+        Write-Log "Formatted group scopes string: $scopeStr"
+
+        # Add group distribution data
+        $groupDistribution = @{
+            Categories = $groupCategories
+            Scopes = $groupScopes
+        }
+
+        Write-Log "Created group distribution object: $($groupDistribution | ConvertTo-Json)"
+
         # Track age and size metrics
         $script:oldestGroup = $null
         $script:largestGroup = $null
@@ -1026,21 +1038,7 @@ function New-HTMLReport {
                 [Math]::Round(($disabledMembers / $totalMembers) * 100, 1)
             } else { 0 }
 
-            # Add group distribution data
-            $groupDistribution = @{
-                Categories = $groupCategories
-                Scopes = $groupScopes
-            }
-
-            # Calculate member percentages
-            $activeMembersPercent = if ($totalMembers -gt 0) {
-                [Math]::Round(($activeMembers / $totalMembers) * 100, 1)
-            } else { 0 }
-            
-            $disabledMembersPercent = if ($totalMembers -gt 0) {
-                [Math]::Round(($disabledMembers / $totalMembers) * 100, 1)
-            } else { 0 }
-
+            # Create template data AFTER processing all groups
             $templateData = @{
                 # Report Metadata
                 REPORT_DATE = "Report Generated: $(Get-Date -Format 'MMMM d, yyyy  •  h:mm tt')"
@@ -1098,6 +1096,8 @@ function New-HTMLReport {
             }
             Write-Log "Template data object created successfully"
             Write-Log "Template data structure contains $($templateData.Count) top-level keys"
+            Write-Log "Group Categories in template: $($templateData.GROUP_CATEGORIES)"
+            Write-Log "Scope Distribution in template: $($templateData.SCOPE_DISTRIBUTION)"
         }
         catch {
             Write-Log "Error creating template data object: $_" -Type Error
