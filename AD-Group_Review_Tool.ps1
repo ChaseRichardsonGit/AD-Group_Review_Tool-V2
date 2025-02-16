@@ -544,10 +544,13 @@ function New-HTMLReport {
                     'Group Name' = $_.Name
                     'SAM Account Name' = $_.SamAccountName
                     'Description' = $_.Description
+                    'Notes' = $_.Info
                     'Health Score' = $_.HealthScore
                     'Health Issues' = ($_.HealthIssues -join '; ')
                     'Total Members' = $_.TotalMembers
                     'User Members' = $_.UserMembers
+                    'Enabled Users' = $_.EnabledUsers
+                    'Disabled Users' = $_.DisabledUsers
                     'Group Members' = $_.GroupMembers
                     'Computer Members' = $_.ComputerMembers
                     'Manager Name' = $_.Manager.DisplayName
@@ -556,12 +559,13 @@ function New-HTMLReport {
                     'Created Date' = $_.Created.ToString('yyyy-MM-dd')
                     'Category' = $_.Category
                     'Scope' = $_.Scope
-                    'Nested In Groups' = $_.NestedInGroupCount
-                    'Has Nested Groups' = $_.HasNestedGroups
                     'Email' = $_.Email
+                    'Nested In Groups Count' = $_.NestedInGroupCount
+                    'Has Nested Groups' = $_.HasNestedGroups
+                    'Parent Groups' = ($_.ParentGroups -join '; ')
+                    'Nested Groups' = ($_.NestedGroups -join '; ')
                     'Organizational Unit' = $_.OU
                     'Distinguished Name' = $_.DN
-                    'Notes' = $_.Info
                 }
             } | Export-Csv -Path $CSVFile -NoTypeInformation -Encoding UTF8
             Write-Log "CSV export completed successfully"
