@@ -1,0 +1,8 @@
+OLD\
+Logs\
+*.log
+*.csv
+*.xlsx
+*.xls
+*.docx
+*.doc

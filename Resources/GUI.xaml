@@ -1,0 +1,320 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Window
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="AD Group Review Tool" 
+    Height="900" 
+    Width="1200"
+    WindowStartupLocation="CenterScreen"
+    Background="#f0f2f5">
+    <Grid>
+        <!-- Loading Overlay -->
+        <Border x:Name="loadingOverlay" 
+                Background="#80000000" 
+                Visibility="Visible"
+                Panel.ZIndex="1000">
+            <Border Background="White" 
+                    CornerRadius="12" 
+                    Width="400"
+                    Height="200"
+                    VerticalAlignment="Center">
+                <Grid Margin="24">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    
+                    <TextBlock Text="Please wait, gathering list of OUs and groups in each OU..." 
+                             TextWrapping="Wrap"
+                             FontSize="16"
+                             FontWeight="SemiBold"
+                             HorizontalAlignment="Center"
+                             Margin="0,0,0,20"/>
+                    
+                    <ProgressBar Grid.Row="1" 
+                               IsIndeterminate="True" 
+                               Height="4" 
+                               Background="Transparent"
+                               Foreground="#007ACC"/>
+                </Grid>
+            </Border>
+        </Border>
+
+        <!-- Main Content -->
+        <Border Margin="24" Background="White" CornerRadius="20" Padding="32">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Header with Icon -->
+                <StackPanel Grid.Row="0" Margin="0,0,0,20" Orientation="Horizontal">
+                    <Viewbox Width="32" Height="32" Margin="0,0,16,0">
+                        <Path Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm0 10c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"
+                              Fill="#007ACC"/>
+                    </Viewbox>
+                    <StackPanel>
+                        <TextBlock Text="AD Group Review Tool" 
+                                 FontSize="28" 
+                                 FontWeight="SemiBold" 
+                                 Foreground="#2D3748"/>
+                        <TextBlock Text="Analyze and optimize Active Directory groups" 
+                                 FontSize="14" 
+                                 Foreground="#718096"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Main Content Area -->
+                <Grid Grid.Row="1">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Feature Icons -->
+                    <UniformGrid Grid.Row="0" Rows="1" Margin="0,0,0,20">
+                        <Border Background="#f8fafc" CornerRadius="8" Padding="16" Margin="4">
+                            <StackPanel>
+                                <Viewbox Width="24" Height="24">
+                                    <Path Data="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.11 0 2-.9 2-2V5c0-1.1-.89-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17L17.59 6.58L19 8l-9 9zM1 9h4v12H1z" 
+                                          Fill="#4A5568"/>
+                                </Viewbox>
+                                <TextBlock Text="Group Analysis" 
+                                         FontSize="14" 
+                                         FontWeight="SemiBold"
+                                         Foreground="#2D3748" 
+                                         HorizontalAlignment="Center" 
+                                         Margin="0,8,0,4"/>
+                                <TextBlock Text="Comprehensive analysis of AD group structure and membership"
+                                         TextAlignment="Center"
+                                         TextWrapping="Wrap"
+                                         FontSize="12"
+                                         Foreground="#718096"
+                                         Margin="0,0,0,8"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="#f8fafc" CornerRadius="8" Padding="16" Margin="4">
+                            <StackPanel>
+                                <Viewbox Width="24" Height="24">
+                                    <Path Data="M9 21h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.58 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2zM9 9l4.34-4.34L12 10h9v2l-3 7H9V9zM1 9h4v12H1z" 
+                                          Fill="#4A5568"/>
+                                </Viewbox>
+                                <TextBlock Text="Health Check" 
+                                         FontSize="14"
+                                         FontWeight="SemiBold" 
+                                         Foreground="#2D3748" 
+                                         HorizontalAlignment="Center" 
+                                         Margin="0,8,0,4"/>
+                                <TextBlock Text="Evaluate group health scores and identify potential issues"
+                                         TextAlignment="Center"
+                                         TextWrapping="Wrap"
+                                         FontSize="12"
+                                         Foreground="#718096"
+                                         Margin="0,0,0,8"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="#f8fafc" CornerRadius="8" Padding="16" Margin="4">
+                            <StackPanel>
+                                <Viewbox Width="24" Height="24">
+                                    <Path Data="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z" 
+                                          Fill="#4A5568"/>
+                                </Viewbox>
+                                <TextBlock Text="Optimization" 
+                                         FontSize="14"
+                                         FontWeight="SemiBold" 
+                                         Foreground="#2D3748" 
+                                         HorizontalAlignment="Center" 
+                                         Margin="0,8,0,4"/>
+                                <TextBlock Text="Recommendations for improving group structure and management"
+                                         TextAlignment="Center"
+                                         TextWrapping="Wrap"
+                                         FontSize="12"
+                                         Foreground="#718096"
+                                         Margin="0,0,0,8"/>
+                            </StackPanel>
+                        </Border>
+                    </UniformGrid>
+
+                    <!-- OU Selection -->
+                    <Border Grid.Row="1" 
+                            Background="#f8fafc" 
+                            CornerRadius="12" 
+                            Padding="20">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                                <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                    <Path Data="M3 3h18v18H3z" Fill="#007ACC"/>
+                                </Viewbox>
+                                <TextBlock Text="Select Organizational Units:" 
+                                         FontSize="16" 
+                                         FontWeight="SemiBold" 
+                                         Foreground="#2D3748"/>
+                            </StackPanel>
+                            
+                            <ScrollViewer Grid.Row="1" 
+                                        MaxHeight="240" 
+                                        VerticalScrollBarVisibility="Auto"
+                                        HorizontalScrollBarVisibility="Disabled">
+                                <ItemsControl x:Name="OUList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Margin="0,4,0,4"
+                                                    Content="{Binding Name}"
+                                                    Tag="{Binding DistinguishedName}"
+                                                    ToolTip="{Binding Description}"
+                                                    IsChecked="False"
+                                                    x:Name="ouCheckBox"
+                                                    Foreground="#4A5568"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- Generate Button and Toggle Button -->
+                <Grid Grid.Row="2" Margin="0,20,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Toggle Select All Button -->
+                    <ToggleButton x:Name="btnToggleSelect"
+                                Height="44"
+                                Width="160"
+                                Padding="20,0"
+                                Margin="0,0,10,0">
+                        <ToggleButton.Template>
+                            <ControlTemplate TargetType="ToggleButton">
+                                <Border Background="#f0f2f5" 
+                                        CornerRadius="8" 
+                                        BorderThickness="1"
+                                        BorderBrush="#CBD5E0">
+                                    <Grid HorizontalAlignment="Center">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                            <Path x:Name="checkIcon"
+                                                  Fill="#4A5568"
+                                                  Data="M19 3H5C3.89 3 3 3.9 3 5V19C3 20.1 3.89 21 5 21H19C20.11 21 21 20.1 21 19V5C21 3.9 20.11 3 19 3ZM10 17L5 12L6.41 10.59L10 14.17L17.59 6.58L19 8L10 17Z"/>
+                                        </Viewbox>
+                                        <TextBlock Grid.Column="1" 
+                                                 x:Name="toggleText"
+                                                 Text="Select All" 
+                                                 FontSize="14"
+                                                 FontWeight="SemiBold"
+                                                 Foreground="#4A5568"
+                                                 VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsChecked" Value="True">
+                                        <Setter TargetName="toggleText" Property="Text" Value="Deselect All"/>
+                                        <Setter TargetName="checkIcon" Property="Data" Value="M19 3H5C3.89 3 3 3.9 3 5V19C3 20.1 3.89 21 5 21H19C20.11 21 21 20.1 21 19V5C21 3.9 20.11 3 19 3ZM16 13H8V11H16V13Z"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </ToggleButton.Template>
+                    </ToggleButton>
+
+                    <!-- Generate Button -->
+                    <Button Grid.Column="1"
+                            x:Name="btnGenerate" 
+                            Height="44"
+                            Width="200"
+                            HorizontalAlignment="Center">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border Background="#007ACC" 
+                                        CornerRadius="8" 
+                                        Padding="20,0">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Viewbox Width="20" Height="20" Margin="0,0,8,0">
+                                            <Path Data="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" 
+                                                  Fill="White"/>
+                                        </Viewbox>
+                                        <TextBlock Grid.Column="1" 
+                                                 Text="Generate Report" 
+                                                 FontSize="16"
+                                                 FontWeight="SemiBold"
+                                                 Foreground="White"
+                                                 VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Log Overlay -->
+        <Border x:Name="logOverlay" 
+                Background="#80000000" 
+                Visibility="Collapsed">
+            <Border Background="White" 
+                    CornerRadius="12" 
+                    Margin="48" 
+                    Padding="24">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <Viewbox Width="24" Height="24" Margin="0,0,12,0">
+                            <Path Data="M4 4L20 20M4 20L20 4" Fill="Transparent" Stroke="#007ACC"/>
+                        </Viewbox>
+                        <TextBlock Text="Operation Progress" 
+                                 FontSize="20" 
+                                 FontWeight="SemiBold"/>
+                    </StackPanel>
+
+                    <ScrollViewer Grid.Row="1" 
+                                VerticalScrollBarVisibility="Auto">
+                        <TextBox x:Name="logTextBox" 
+                                IsReadOnly="True" 
+                                Background="Transparent" 
+                                BorderThickness="0" 
+                                FontFamily="Consolas" 
+                                FontSize="13"
+                                TextWrapping="Wrap"/>
+                    </ScrollViewer>
+
+                    <Button Grid.Row="2" 
+                            x:Name="btnCloseLog" 
+                            Content="Close" 
+                            HorizontalAlignment="Right" 
+                            Margin="0,16,0,0" 
+                            Padding="24,8" 
+                            Background="#007ACC" 
+                            Foreground="White" 
+                            BorderThickness="0">
+                        <Button.Resources>
+                            <Style TargetType="Border">
+                                <Setter Property="CornerRadius" Value="6"/>
+                            </Style>
+                        </Button.Resources>
+                    </Button>
+                </Grid>
+            </Border>
+        </Border>
+    </Grid>
+</Window> 
