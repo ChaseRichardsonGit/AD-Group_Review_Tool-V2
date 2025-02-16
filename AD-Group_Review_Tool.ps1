@@ -496,266 +496,414 @@ function New-HTMLReport {
     param($Groups)
     
     try {
+        Write-Log "Starting HTML report generation process..."
+        Write-Log "Step 1: Setting up file paths..."
+        
         $DownloadsFolder = Get-DownloadsFolder
+        Write-Log "Downloads folder resolved to: $DownloadsFolder"
+        
         $TimeStamp = Get-Date -Format 'yyyyMMdd_HHmmss'
+        Write-Log "Generated timestamp: $TimeStamp"
+        
         $ReportFile = Join-Path $DownloadsFolder "ADGroupReview_$TimeStamp.html"
         $CSVFile = Join-Path $DownloadsFolder "ADGroupReview_$TimeStamp.csv"
-        Write-Log "Generating reports: HTML and CSV"
-        
-        # Export CSV with formatted data
-        Write-Log "Generating CSV export..."
-        $Groups | ForEach-Object {
-            [PSCustomObject]@{
-                'Group Name' = $_.Name
-                'SAM Account Name' = $_.SamAccountName
-                'Description' = $_.Description
-                'Health Score' = $_.HealthScore
-                'Health Issues' = ($_.HealthIssues -join '; ')
-                'Total Members' = $_.TotalMembers
-                'User Members' = $_.UserMembers
-                'Group Members' = $_.GroupMembers
-                'Computer Members' = $_.ComputerMembers
-                'Manager Name' = $_.Manager.DisplayName
-                'Manager Title' = $_.Manager.Title
-                'Manager Email' = $_.Manager.UPN
-                'Created Date' = $_.Created.ToString('yyyy-MM-dd')
-                'Category' = $_.Category
-                'Scope' = $_.Scope
-                'Nested In Groups' = $_.NestedInGroupCount
-                'Has Nested Groups' = $_.HasNestedGroups
-                'Email' = $_.Email
-                'Organizational Unit' = $_.OU
-                'Distinguished Name' = $_.DN
-                'Notes' = $_.Info
-            }
-        } | Export-Csv -Path $CSVFile -NoTypeInformation -Encoding UTF8
-        Write-Log "CSV export saved to: $CSVFile"
+        Write-Log "Report files will be saved as:`nHTML: $ReportFile`nCSV: $CSVFile"
 
-        # Calculate statistics
-        $totalGroups = $Groups.Count
-        $emptyGroups = @($Groups | Where-Object { $_.TotalMembers -eq 0 } | Sort-Object -Unique DN).Count
-        $noManager = @($Groups | Where-Object { -not $_.Manager } | Sort-Object -Unique DN).Count
-        $noDescription = @($Groups | Where-Object { -not $_.Description } | Sort-Object -Unique DN).Count
-        $nestedGroups = @($Groups | Where-Object { $_.HasNestedGroups } | Sort-Object -Unique DN).Count
-        $avgHealth = ($Groups | Sort-Object -Unique DN | Measure-Object -Property HealthScore -Average).Average
-        $criticalGroups = @($Groups | Where-Object { $_.HealthScore -le 50 } | Sort-Object -Unique DN).Count
-        $warningGroups = @($Groups | Where-Object { $_.HealthScore -gt 50 -and $_.HealthScore -le 80 } | Sort-Object -Unique DN).Count
-        $healthyGroups = @($Groups | Where-Object { $_.HealthScore -gt 80 } | Sort-Object -Unique DN).Count
-        
-        # Calculate additional statistics
-        $totalMembers = ($Groups | Measure-Object -Property TotalMembers -Sum).Sum
-        $activeMembers = ($Groups | Measure-Object -Property UserMembers -Sum).Sum
-        $disabledMembers = ($Groups | Where-Object { -not $_.Manager } | Measure-Object -Property UserMembers -Sum).Sum
-        $oldestGroup = $Groups | Sort-Object Created | Select-Object -First 1
-        $newestGroup = $Groups | Sort-Object Created -Descending | Select-Object -First 1
+        Write-Log "Step 2: Exporting CSV data..."
+        Write-Log "Processing $($Groups.Count) groups for CSV export"
+        try {
+            $Groups | ForEach-Object {
+                [PSCustomObject]@{
+                    'Group Name' = $_.Name
+                    'SAM Account Name' = $_.SamAccountName
+                    'Description' = $_.Description
+                    'Health Score' = $_.HealthScore
+                    'Health Issues' = ($_.HealthIssues -join '; ')
+                    'Total Members' = $_.TotalMembers
+                    'User Members' = $_.UserMembers
+                    'Group Members' = $_.GroupMembers
+                    'Computer Members' = $_.ComputerMembers
+                    'Manager Name' = $_.Manager.DisplayName
+                    'Manager Title' = $_.Manager.Title
+                    'Manager Email' = $_.Manager.UPN
+                    'Created Date' = $_.Created.ToString('yyyy-MM-dd')
+                    'Category' = $_.Category
+                    'Scope' = $_.Scope
+                    'Nested In Groups' = $_.NestedInGroupCount
+                    'Has Nested Groups' = $_.HasNestedGroups
+                    'Email' = $_.Email
+                    'Organizational Unit' = $_.OU
+                    'Distinguished Name' = $_.DN
+                    'Notes' = $_.Info
+                }
+            } | Export-Csv -Path $CSVFile -NoTypeInformation -Encoding UTF8
+            Write-Log "CSV export completed successfully"
+        }
+        catch {
+            Write-Log "Error during CSV export: $_" -Type Error
+            Write-Log "CSV export error details: $($_.Exception.Message)" -Type Error
+            Write-Log "CSV export stack trace: $($_.ScriptStackTrace)" -Type Error
+        }
 
-        # Process OU statistics
-        $ouStats = ${script:OUStats}.GetEnumerator() | ForEach-Object {
-            $fullDN = $_.Key
-            $stats = $_.Value
+        Write-Log "Step 3: Calculating statistics..."
+        Write-Log "Calculating group statistics..."
+        try {
+            $totalGroups = $Groups.Count
+            Write-Log "Total Groups: $totalGroups"
             
-            # Split DN and get OU parts
-            $parts = $fullDN -split ',' | Where-Object { $_ -match '^(OU|DC)=' }
-            $ouParts = @($parts | Where-Object { $_ -match '^OU=' })
-            $currentOU = ($ouParts[0] -replace '^OU=','').Trim()
-            $parentOU = if ($ouParts.Count -gt 1) {
-                ($ouParts[1] -replace '^OU=','').Trim()
-            } else { 
-                $null 
+            $emptyGroups = @($Groups | Where-Object { $_.TotalMembers -eq 0 } | Sort-Object -Unique DN).Count
+            Write-Log "Empty Groups: $emptyGroups"
+            
+            $noManager = @($Groups | Where-Object { -not $_.Manager } | Sort-Object -Unique DN).Count
+            Write-Log "Groups without Manager: $noManager"
+            
+            $noDescription = @($Groups | Where-Object { -not $_.Description } | Sort-Object -Unique DN).Count
+            Write-Log "Groups without Description: $noDescription"
+            
+            $nestedGroups = @($Groups | Where-Object { $_.HasNestedGroups } | Sort-Object -Unique DN).Count
+            Write-Log "Nested Groups: $nestedGroups"
+            
+            $avgHealth = ($Groups | Sort-Object -Unique DN | Measure-Object -Property HealthScore -Average).Average
+            Write-Log "Average Health Score: $avgHealth"
+            
+            $criticalGroups = @($Groups | Where-Object { $_.HealthScore -le 50 } | Sort-Object -Unique DN).Count
+            Write-Log "Critical Health Groups: $criticalGroups"
+            
+            $warningGroups = @($Groups | Where-Object { $_.HealthScore -gt 50 -and $_.HealthScore -le 80 } | Sort-Object -Unique DN).Count
+            Write-Log "Warning Health Groups: $warningGroups"
+            
+            $healthyGroups = @($Groups | Where-Object { $_.HealthScore -gt 80 } | Sort-Object -Unique DN).Count
+            Write-Log "Healthy Groups: $healthyGroups"
+        }
+        catch {
+            Write-Log "Error calculating group statistics: $_" -Type Error
+            Write-Log "Statistics error details: $($_.Exception.Message)" -Type Error
+            Write-Log "Statistics stack trace: $($_.ScriptStackTrace)" -Type Error
+        }
+
+        Write-Log "Step 4: Processing OU statistics..."
+        try {
+            Write-Log "Processing OU statistics from ${script:OUStats}..."
+            Write-Log "Number of OUs to process: $(${script:OUStats}.Count)"
+            
+            $ouStats = ${script:OUStats}.GetEnumerator() | ForEach-Object {
+                $fullDN = $_.Key
+                $stats = $_.Value
+                Write-Log "Processing OU: $fullDN" -NoConsole
+                
+                # Split DN and get OU parts
+                $parts = $fullDN -split ',' | Where-Object { $_ -match '^(OU|DC)=' }
+                $ouParts = @($parts | Where-Object { $_ -match '^OU=' })
+                $currentOU = ($ouParts[0] -replace '^OU=','').Trim()
+                $parentOU = if ($ouParts.Count -gt 1) {
+                    ($ouParts[1] -replace '^OU=','').Trim()
+                } else { $null }
+                
+                # Check if this is a child OU
+                $isChildOU = -not (${script:OUStats}.Keys | Where-Object { 
+                    $_ -ne $fullDN -and $_ -like "*,$fullDN"
+                })
+                
+                if ($isChildOU) {
+                    Write-Log "Found child OU: $currentOU" -NoConsole
+                    $disabledPercentage = if ($stats.TotalMembers -gt 0) {
+                        [math]::Round(($stats.DisabledMembers / $stats.TotalMembers) * 100, 1)
+                    } else { 0 }
+                    
+                    @{
+                        CurrentOU = $currentOU
+                        ParentOU = $parentOU
+                        FullDN = $fullDN
+                        GroupCount = $stats.GroupCount
+                        EnabledMembers = $stats.EnabledMembers
+                        DisabledMembers = $stats.DisabledMembers
+                        TotalMembers = ($stats.EnabledMembers + $stats.DisabledMembers)
+                        DisabledPercentage = $disabledPercentage
+                        NestedGroupCount = $stats.NestedGroupCount
+                        MaxNestingDepth = $stats.MaxNestingDepth
+                    }
+                }
+            } | Where-Object { $_ -ne $null } | Sort-Object { $_.GroupCount } -Descending
+            
+            Write-Log "Processed $(($ouStats | Measure-Object).Count) child OUs"
+        }
+        catch {
+            Write-Log "Error processing OU statistics: $_" -Type Error
+            Write-Log "OU statistics error details: $($_.Exception.Message)" -Type Error
+            Write-Log "OU statistics stack trace: $($_.ScriptStackTrace)" -Type Error
+        }
+
+        Write-Log "Step 5: Calculating member totals..."
+        try {
+            # Calculate totals from child OUs only
+            $childOUs = $ouStats | Where-Object { $_ -ne $null }
+            
+            Write-Log "Found $($childOUs.Count) child OUs for member calculations"
+            
+            # Calculate member totals from child OUs
+            $totalMembers = ($childOUs | Measure-Object -Property TotalMembers -Sum).Sum
+            Write-Log "Total Members: $totalMembers"
+            
+            $activeMembers = ($childOUs | Measure-Object -Property EnabledMembers -Sum).Sum
+            Write-Log "Active Members: $activeMembers"
+            
+            $disabledMembers = ($childOUs | Measure-Object -Property DisabledMembers -Sum).Sum
+            Write-Log "Disabled Members: $disabledMembers"
+            
+            Write-Log "Member distribution - Enabled: $activeMembers, Disabled: $disabledMembers, Total: $totalMembers"
+        }
+        catch {
+            Write-Log "Error calculating member totals: $_" -Type Error
+            Write-Log "Member totals error details: $($_.Exception.Message)" -Type Error
+            Write-Log "Member totals stack trace: $($_.ScriptStackTrace)" -Type Error
+        }
+
+        Write-Log "Step 6: Formatting groups for template..."
+        try {
+            Write-Log "Starting group formatting for $($Groups.Count) groups..."
+            $formattedGroups = $Groups | Sort-Object -Unique Name | 
+                Sort-Object @{Expression={$_.TotalMembers}; Descending=$true}, Name | 
+                ForEach-Object {
+                    Write-Log "Formatting group: $($_.Name)" -NoConsole
+                    
+                    $healthClass = if ($_.HealthScore -le 50) {
+                        'badge-critical'
+                    } elseif ($_.HealthScore -le 80) {
+                        'badge-warning'
+                    } else {
+                        'badge-success'
+                    }
+
+                    @{
+                        ID = [System.Web.HttpUtility]::HtmlEncode($_.DN)
+                        Name = [System.Web.HttpUtility]::HtmlEncode($_.Name)
+                        SamAccountName = [System.Web.HttpUtility]::HtmlEncode($_.SamAccountName)
+                        Description = [System.Web.HttpUtility]::HtmlEncode($_.Description)
+                        HealthScore = $_.HealthScore
+                        HealthClass = $healthClass
+                        TotalMembers = $_.TotalMembers
+                        UserMembers = $_.UserMembers
+                        GroupMembers = $_.GroupMembers
+                        ComputerMembers = $_.ComputerMembers
+                        EnabledUsers = $_.EnabledUsers
+                        DisabledUsers = $_.DisabledUsers
+                        Manager = if ($_.Manager) {
+                            @{
+                                DisplayName = [System.Web.HttpUtility]::HtmlEncode($_.Manager.DisplayName)
+                                Title = [System.Web.HttpUtility]::HtmlEncode($_.Manager.Title)
+                                UPN = [System.Web.HttpUtility]::HtmlEncode($_.Manager.UPN)
+                            }
+                        } else { $null }
+                        Created = $_.Created.ToString('yyyy-MM-dd')
+                        Category = [System.Web.HttpUtility]::HtmlEncode($_.Category)
+                        Scope = [System.Web.HttpUtility]::HtmlEncode($_.Scope)
+                        Email = [System.Web.HttpUtility]::HtmlEncode($_.Email)
+                        DN = [System.Web.HttpUtility]::HtmlEncode($_.DN)
+                        OU = [System.Web.HttpUtility]::HtmlEncode($_.OU)
+                        HealthIssues = @($_.HealthIssues | ForEach-Object { 
+                            [System.Web.HttpUtility]::HtmlEncode($_) 
+                        })
+                        ParentGroups = @($_.ParentGroups | ForEach-Object { 
+                            [System.Web.HttpUtility]::HtmlEncode($_) 
+                        })
+                        NestedGroups = @($_.NestedGroups | ForEach-Object { 
+                            [System.Web.HttpUtility]::HtmlEncode($_) 
+                        })
+                        NestingDepth = $_.NestingDepth
+                        NestingWarning = $_.NestingDepth -gt 5
+                        HasNestedGroups = $_.HasNestedGroups
+                    }
+                }
+            Write-Log "Completed formatting $($formattedGroups.Count) groups"
+        }
+        catch {
+            Write-Log "Error formatting groups: $_" -Type Error
+            Write-Log "Group formatting error details: $($_.Exception.Message)" -Type Error
+            Write-Log "Group formatting stack trace: $($_.ScriptStackTrace)" -Type Error
+        }
+
+        Write-Log "Step 7: Calculating percentages..."
+        try {
+            $noManagerPercent = [Math]::Round(($noManager / $totalGroups) * 100, 1)
+            $noDescriptionPercent = [Math]::Round(($noDescription / $totalGroups) * 100, 1)
+            Write-Log "Calculated percentages: No Manager: $noManagerPercent%, No Description: $noDescriptionPercent%"
+        }
+        catch {
+            Write-Log "Error calculating percentages: $_" -Type Error
+        }
+
+        Write-Log "Step 8: Creating template data object..."
+        try {
+            Write-Log "Processing age and size analysis data..."
+            
+            # Oldest Group calculation
+            $oldestGroup = $Groups | Sort-Object Created | Select-Object -First 1
+            $oldestGroupData = @{
+                Name = if ($oldestGroup) { $oldestGroup.Name } else { "N/A" }
+                Created = if ($oldestGroup) { $oldestGroup.Created.ToString('MMMM d, yyyy') } else { "N/A" }
             }
+            Write-Log "Oldest group: $($oldestGroupData.Name), Created: $($oldestGroupData.Created)"
+
+            # Largest Group calculation
+            $largestGroup = $Groups | Sort-Object TotalMembers -Descending | Select-Object -First 1
+            $largestGroupData = @{
+                Name = if ($largestGroup) { $largestGroup.Name } else { "N/A" }
+                Members = if ($largestGroup) { $largestGroup.TotalMembers } else { 0 }
+            }
+            Write-Log "Largest group: $($largestGroupData.Name), Members: $($largestGroupData.Members)"
+
+            # Largest OU calculation
+            $largestOU = $ouStats.GetEnumerator() | Sort-Object { $_.Value.GroupCount } -Descending | Select-Object -First 1
+            $largestOUData = @{
+                Name = if ($largestOU) { ($largestOU.Key -split ',')[0] -replace '^OU=' } else { "N/A" }
+                Groups = if ($largestOU) { $largestOU.Value.GroupCount } else { 0 }
+            }
+            Write-Log "Largest OU: $($largestOUData.Name), Groups: $($largestOUData.Groups)"
+
+            $templateData = @{
+                # Report Metadata
+                REPORT_DATE = "Report Generated: $(Get-Date -Format 'MMMM d, yyyy  •  h:mm tt')"
+                
+                # Group Overview
+                TOTAL_GROUPS = $totalGroups
+                EMPTY_GROUPS = $emptyGroups
+                AVG_GROUPS_PER_OU = [Math]::Round(($totalGroups / ($ouStats.Count + 0.0)), 1)
+                
+                # Health Status
+                AVG_HEALTH = [Math]::Round($avgHealth, 1)
+                CRITICAL_GROUPS = $criticalGroups
+                WARNING_GROUPS = $warningGroups
+                HEALTHY_GROUPS = $healthyGroups
+                
+                # OU Statistics
+                TOTAL_OUS = $ouStats.Count
+                EMPTY_OUS = @($ouStats | Where-Object { $_.GroupCount -eq 0 }).Count
+                MAX_GROUPS_OU = ($ouStats | Measure-Object -Property GroupCount -Maximum).Maximum
+                
+                # User Distribution
+                TOTAL_MEMBERS = $totalMembers
+                DISABLED_USERS = $disabledMembers
+                ACTIVE_MEMBERS = $activeMembers
+                USER_DISTRIBUTION = @{
+                    Enabled = $activeMembers
+                    Disabled = $disabledMembers
+                }
+                
+                # Management Status
+                NO_MANAGER = $noManager
+                NO_DESCRIPTION = $noDescription
+                NO_MANAGER_PERCENT = $noManagerPercent
+                NO_DESCRIPTION_PERCENT = $noDescriptionPercent
+                
+                # Group Structure
+                NESTED_GROUPS = $nestedGroups
+                MAX_NESTING_DEPTH = ($Groups | Measure-Object -Property NestingDepth -Maximum).Maximum
+                GROUP_CATEGORIES = "Security: $totalGroups"
+                SCOPE_DISTRIBUTION = "Global: $totalGroups"
+                
+                # Age and Size Analysis
+                OLDEST_GROUP = $oldestGroupData
+                LARGEST_GROUP = $largestGroupData
+                LARGEST_OU = $largestOUData
+                
+                # Full Data Sets
+                GROUPS = $formattedGroups
+                OU_STATS = $ouStats
+            }
+            Write-Log "Template data object created successfully"
+            Write-Log "Template data structure contains $($templateData.Count) top-level keys"
+        }
+        catch {
+            Write-Log "Error creating template data object: $_" -Type Error
+            Write-Log "Template data error details: $($_.Exception.Message)" -Type Error
+            Write-Log "Template data stack trace: $($_.ScriptStackTrace)" -Type Error
+            throw
+        }
+
+        Write-Log "Step 9: Converting template data to JSON..."
+        try {
+            Write-Log "Converting template data to JSON format..."
+            $templateDataJson = $templateData | ConvertTo-Json -Depth 10 -Compress
+            Write-Log "JSON conversion successful. JSON length: $($templateDataJson.Length) characters"
+        }
+        catch {
+            Write-Log "Error converting template data to JSON: $_" -Type Error
+            Write-Log "JSON conversion error details: $($_.Exception.Message)" -Type Error
+        }
+
+        Write-Log "Step 10: Loading and formatting HTML template..."
+        try {
+            Write-Log "Loading HTML template from: $script:HtmlTemplateFile"
+            if (-not $script:HTMLTemplate) {
+                throw "HTML template is null or empty"
+            }
+            $HTML = $script:HTMLTemplate
+            Write-Log "HTML template loaded successfully. Length: $($HTML.Length) characters"
             
-            # Only include if this is a child OU (has no child OUs under it)
-            $isChildOU = -not (${script:OUStats}.Keys | Where-Object { 
-                $_ -ne $fullDN -and $_ -like "*,$fullDN"
+            Write-Log "Replacing template data placeholder..."
+            $HTML = $HTML -replace 'var templateData = \{[^}]*\};', "var templateData = $templateDataJson;"
+            Write-Log "Template data replacement completed. New HTML length: $($HTML.Length) characters"
+        }
+        catch {
+            Write-Log "Error loading or formatting HTML template: $_" -Type Error
+            Write-Log "HTML template error details: $($_.Exception.Message)" -Type Error
+            Write-Log "HTML template stack trace: $($_.ScriptStackTrace)" -Type Error
+        }
+
+        Write-Log "Step 11: Saving report..."
+        try {
+            Write-Log "Creating UTF8 encoding without BOM..."
+            $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
+            
+            Write-Log "Writing HTML file to: $ReportFile"
+            [System.IO.File]::WriteAllLines($ReportFile, $HTML, $Utf8NoBomEncoding)
+            Write-Log "HTML file saved successfully"
+        }
+        catch {
+            Write-Log "Error saving HTML file: $_" -Type Error
+            Write-Log "File save error details: $($_.Exception.Message)" -Type Error
+            Write-Log "File save stack trace: $($_.ScriptStackTrace)" -Type Error
+        }
+
+        Write-Log "Step 12: Opening report..."
+        try {
+            $script:Window.Dispatcher.Invoke({
+                try {
+                    Write-Log "Opening HTML report..."
+                    Start-Process $ReportFile
+                    
+                    Write-Log "Reports generated successfully"
+                    [System.Windows.MessageBox]::Show(
+                        "Report generated successfully!`n`nHTML Report: $(Split-Path $ReportFile -Leaf)`nCSV Export: $(Split-Path $CSVFile -Leaf)", 
+                        "Success",
+                        [System.Windows.MessageBoxButton]::OK,
+                        [System.Windows.MessageBoxImage]::Information
+                    )
+                }
+                catch {
+                    Write-Log "Error opening report: $_" -Type Error
+                    Write-Log "Report opening error details: $($_.Exception.Message)" -Type Error
+                    [System.Windows.MessageBox]::Show(
+                        "Report generated but could not be opened automatically.`n`nLocation: $ReportFile", 
+                        "Warning"
+                    )
+                }
             })
             
-            if ($isChildOU) {
-                # Calculate disabled percentage
-                $disabledPercentage = if ($stats.TotalMembers -gt 0) {
-                    [math]::Round(($stats.DisabledMembers / $stats.TotalMembers) * 100, 1)
-                } else { 
-                    0 
-                }
-                
-                @{
-                    CurrentOU = $currentOU
-                    ParentOU = $parentOU
-                    FullDN = $fullDN
-                    GroupCount = $stats.GroupCount
-                    EnabledMembers = $stats.EnabledMembers
-                    DisabledMembers = $stats.DisabledMembers
-                    TotalMembers = ($stats.EnabledMembers + $stats.DisabledMembers)
-                    DisabledPercentage = $disabledPercentage
-                    NestedGroupCount = $stats.NestedGroupCount
-                    MaxNestingDepth = $stats.MaxNestingDepth
-                }
-            }
-        } | Where-Object { $_ -ne $null } | Sort-Object { $_.GroupCount } -Descending
-
-        # Calculate totals using only child OU data
-        $totalMembers = ($ouStats | Measure-Object -Property TotalMembers -Sum).Sum
-        $activeMembers = ($ouStats | Measure-Object -Property EnabledMembers -Sum).Sum
-        $disabledMembers = ($ouStats | Measure-Object -Property DisabledMembers -Sum).Sum
-
-        # Format groups for template
-        $formattedGroups = $Groups | Sort-Object -Unique Name | Sort-Object @{Expression={$_.TotalMembers}; Descending=$true}, Name | ForEach-Object {
-            $healthClass = if ($_.HealthScore -le 50) {
-                'badge-critical'
-            } elseif ($_.HealthScore -le 80) {
-                'badge-warning'
-            } else {
-                'badge-success'
-            }
-
-            @{
-                ID = [System.Web.HttpUtility]::HtmlEncode($_.DN)
-                Name = [System.Web.HttpUtility]::HtmlEncode($_.Name)
-                SamAccountName = [System.Web.HttpUtility]::HtmlEncode($_.SamAccountName)
-                Description = [System.Web.HttpUtility]::HtmlEncode($_.Description)
-                HealthScore = $_.HealthScore
-                HealthClass = $healthClass
-                TotalMembers = $_.TotalMembers
-                UserMembers = $_.UserMembers
-                GroupMembers = $_.GroupMembers
-                ComputerMembers = $_.ComputerMembers
-                EnabledUsers = $_.EnabledUsers
-                DisabledUsers = $_.DisabledUsers
-                Manager = if ($_.Manager) {
-                    @{
-                        DisplayName = [System.Web.HttpUtility]::HtmlEncode($_.Manager.DisplayName)
-                        Title = [System.Web.HttpUtility]::HtmlEncode($_.Manager.Title)
-                        UPN = [System.Web.HttpUtility]::HtmlEncode($_.Manager.UPN)
-                    }
-                } else { 
-                    $null 
-                }
-                Created = $_.Created.ToString('yyyy-MM-dd')
-                Category = [System.Web.HttpUtility]::HtmlEncode($_.Category)
-                Scope = [System.Web.HttpUtility]::HtmlEncode($_.Scope)
-                Email = [System.Web.HttpUtility]::HtmlEncode($_.Email)
-                DN = [System.Web.HttpUtility]::HtmlEncode($_.DN)
-                OU = [System.Web.HttpUtility]::HtmlEncode($_.OU)
-                HealthIssues = @($_.HealthIssues | ForEach-Object { [System.Web.HttpUtility]::HtmlEncode($_) })
-                ParentGroups = @($_.ParentGroups | ForEach-Object { [System.Web.HttpUtility]::HtmlEncode($_) })
-                NestedGroups = @($_.NestedGroups | ForEach-Object { [System.Web.HttpUtility]::HtmlEncode($_) })
-                NestingDepth = $_.NestingDepth
-                NestingWarning = $_.NestingDepth -gt 5
-                HasNestedGroups = $_.HasNestedGroups
-            }
+            Write-Log "HTML report generation completed successfully"
+            return $true
         }
-
-        # Calculate percentages
-        $noManagerPercent = [Math]::Round(($noManager / $totalGroups) * 100, 1)
-        $noDescriptionPercent = [Math]::Round(($noDescription / $totalGroups) * 100, 1)
-
-        # Create template data object
-        $templateData = @{
-            # Report Metadata
-            REPORT_DATE = (Get-Date -Format "MMMM d, yyyy  •  HH:mm")
-            
-            # Group Overview
-            TOTAL_GROUPS = $totalGroups
-            EMPTY_GROUPS = $emptyGroups
-            AVG_GROUPS_PER_OU = [Math]::Round(($totalGroups / ($ouStats.Count + 0.0)), 1)
-            
-            # Health Status
-            AVG_HEALTH = [Math]::Round($avgHealth, 1)
-            CRITICAL_GROUPS = $criticalGroups
-            WARNING_GROUPS = $warningGroups
-            HEALTHY_GROUPS = $healthyGroups
-            
-            # OU Statistics
-            TOTAL_OUS = $ouStats.Count
-            EMPTY_OUS = @($ouStats | Where-Object { $_.GroupCount -eq 0 }).Count
-            MAX_GROUPS_OU = ($ouStats | Measure-Object -Property GroupCount -Maximum).Maximum
-            
-            # User Distribution
-            TOTAL_MEMBERS = $totalMembers
-            DISABLED_USERS = $disabledMembers
-            ACTIVE_MEMBERS = $activeMembers
-            USER_DISTRIBUTION = @{
-                Enabled = $activeMembers
-                Disabled = $disabledMembers
-            }
-            
-            # Management Status
-            NO_MANAGER = $noManager
-            NO_DESCRIPTION = $noDescription
-            NO_MANAGER_PERCENT = $noManagerPercent
-            NO_DESCRIPTION_PERCENT = $noDescriptionPercent
-            
-            # Group Structure
-            NESTED_GROUPS = $nestedGroups
-            MAX_NESTING_DEPTH = ($Groups | Measure-Object -Property NestingDepth -Maximum).Maximum
-            GROUP_CATEGORIES = "Security: $totalGroups"
-            SCOPE_DISTRIBUTION = "Global: $totalGroups"
-            
-            # Age and Size Analysis
-            OLDEST_GROUP = @{
-                Name = ($Groups | Sort-Object Created | Select-Object -First 1).Name
-                Created = ($Groups | Sort-Object Created | Select-Object -First 1).Created.ToString('yyyy-MM-dd')
-            }
-            LARGEST_GROUP = @{
-                Name = ($Groups | Sort-Object TotalMembers -Descending | Select-Object -First 1).Name
-                Members = ($Groups | Sort-Object TotalMembers -Descending | Select-Object -First 1).TotalMembers
-            }
-            LARGEST_OU = @{
-                Name = ($ouStats | Sort-Object GroupCount -Descending | Select-Object -First 1).CurrentOU
-                Groups = ($ouStats | Sort-Object GroupCount -Descending | Select-Object -First 1).GroupCount
-            }
-            
-            # Full Data Sets
-            GROUPS = $formattedGroups
-            OU_STATS = $ouStats
+        catch {
+            Write-Log "Error in final report opening step: $_" -Type Error
+            Write-Log "Final step error details: $($_.Exception.Message)" -Type Error
+            Write-Log "Final step stack trace: $($_.ScriptStackTrace)" -Type Error
+            return $false
         }
-
-        # Convert template data to JSON for JavaScript
-        $templateDataJson = $templateData | ConvertTo-Json -Depth 10 -Compress
-
-        # Load and format HTML template
-        $HTML = $script:HTMLTemplate
-        
-        # Replace template data placeholder
-        $HTML = $HTML -replace 'var templateData = \{[^}]*\};', "var templateData = $templateDataJson;"
-        
-        # Save report with UTF8 encoding without BOM
-        $Utf8NoBomEncoding = New-Object System.Text.UTF8Encoding $False
-        [System.IO.File]::WriteAllLines($ReportFile, $HTML, $Utf8NoBomEncoding)
-        Write-Log "Report saved to: $ReportFile"
-        
-        # Open the downloads folder and report in a UI-safe way
-        $script:Window.Dispatcher.Invoke({
-            try {
-                Write-Log "Opening report location..."
-                # Open folder and select both files
-                $script:files = @($ReportFile, $CSVFile)
-                Start-Process "explorer.exe" -ArgumentList "/select,`"$ReportFile`""
-                
-                Write-Log "Opening HTML report..."
-                Start-Process $ReportFile
-                
-                Write-Log "Reports generated successfully"
-                [System.Windows.MessageBox]::Show(
-                    "Reports generated successfully!`n`nHTML Report: $(Split-Path $ReportFile -Leaf)`nCSV Export: $(Split-Path $CSVFile -Leaf)`n`nLocation: $DownloadsFolder", 
-                    "Success",
-                    [System.Windows.MessageBoxButton]::OK,
-                    [System.Windows.MessageBoxImage]::Information
-                )
     }
     catch {
-                Write-Log "Error opening reports: $_"
-                [System.Windows.MessageBox]::Show(
-                    "Reports generated but could not be opened automatically.`n`nLocation: $DownloadsFolder`n`nFiles:`n- $(Split-Path $ReportFile -Leaf)`n- $(Split-Path $CSVFile -Leaf)", 
-                    "Warning"
-                )
-            }
-        })
-        
-        return $true
-    }
-    catch {
-        Write-Log "Error generating HTML report: $_"
-        Write-Log "Stack trace: $($_.ScriptStackTrace)"
+        Write-Log "Critical error in HTML report generation: $_" -Type Error
+        Write-Log "Critical error details: $($_.Exception.Message)" -Type Error
+        Write-Log "Critical error stack trace: $($_.ScriptStackTrace)" -Type Error
         $script:Window.Dispatcher.Invoke({
             [System.Windows.MessageBox]::Show("Error generating report. Check the log file for details.", "Error")
         })
@@ -764,7 +912,7 @@ function New-HTMLReport {
 }
 
 # Function to prepare report data
-function Prepare-ReportData {
+function Initialize-ReportData {
     param(
         [Parameter(Mandatory=$true)]
         [array]$Groups,
@@ -847,11 +995,11 @@ function Prepare-ReportData {
             OU_STATS = $OUStats
         }
         
-        Write-Log -Message "Report data prepared successfully" -Type Success
+        Write-Log -Message "Report data initialized successfully" -Type Success
         return $reportData
     }
     catch {
-        Write-Log -Message "Error preparing report data: $_" -Type Error
+        Write-Log -Message "Error initializing report data: $_" -Type Error
         return $null
     }
 }
