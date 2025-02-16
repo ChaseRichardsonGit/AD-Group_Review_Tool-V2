@@ -40,56 +40,6 @@ if (-not (Test-Path $LogDir)) {
 # Initialize logging
 $LogFile = Join-Path $LogDir "GroupReview_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
 
-# Create runspace-safe variables
-$script:LogTextBox = $null
-$script:LogOverlay = $null
-$script:Window = $null
-$script:StopProcessing = $false
-
-# Set up paths for resource files
-$script:XamlFile = Join-Path $ScriptDir "Resources\GUI.xaml"
-$script:HtmlTemplateFile = Join-Path $ScriptDir "Resources\HTML_Template.html"
-
-Write-Host "XAML File Path: $($script:XamlFile)"
-Write-Host "HTML Template Path: $($script:HtmlTemplateFile)"
-
-# Verify resource files exist
-if (-not (Test-Path $script:XamlFile)) {
-    Write-Error "XAML file not found: $script:XamlFile"
-    return
-}
-
-if (-not (Test-Path $script:HtmlTemplateFile)) {
-    Write-Error "HTML template file not found: $script:HtmlTemplateFile"
-    return
-}
-
-# Load XAML and HTML templates
-try {
-    Write-Host "Loading XAML from: $($script:XamlFile)"
-    $xamlContent = Get-Content -Path $script:XamlFile -Raw -ErrorAction Stop
-    if ([string]::IsNullOrWhiteSpace($xamlContent)) {
-        throw "XAML file is empty"
-    }
-    [xml]$script:XAML = $xamlContent
-    Write-Host "XAML loaded successfully"
-    Write-Log "Loaded XAML template from: $script:XamlFile"
-    
-    Write-Host "Loading HTML template from: $($script:HtmlTemplateFile)"
-    $script:HTMLTemplate = Get-Content -Path $script:HtmlTemplateFile -Raw -ErrorAction Stop
-    if ([string]::IsNullOrWhiteSpace($script:HTMLTemplate)) {
-        throw "HTML template file is empty"
-    }
-    Write-Host "HTML template loaded successfully"
-    Write-Log "Loaded HTML template from: $script:HtmlTemplateFile"
-}
-catch {
-    Write-Error "Error loading resource files: $_"
-    Write-Host "Error details: $($_.Exception.Message)"
-    Write-Host "Stack trace: $($_.ScriptStackTrace)"
-    return
-}
-
 function Write-Log {
     param(
         [Parameter(Mandatory=$true)]
@@ -143,6 +93,58 @@ function Write-Log {
     catch {
         Write-Host "Error in Write-Log: $_" -ForegroundColor Red
     }
+}
+
+# Create runspace-safe variables
+$script:LogTextBox = $null
+$script:LogOverlay = $null
+$script:Window = $null
+$script:StopProcessing = $false
+$script:OUStats = @{}
+$script:OUUniqueUsers = @{}  # Add tracking for unique users per OU
+
+# Set up paths for resource files
+$script:XamlFile = Join-Path $ScriptDir "Resources\GUI.xaml"
+$script:HtmlTemplateFile = Join-Path $ScriptDir "Resources\HTML_Template.html"
+
+Write-Host "XAML File Path: $($script:XamlFile)"
+Write-Host "HTML Template Path: $($script:HtmlTemplateFile)"
+
+# Verify resource files exist
+if (-not (Test-Path $script:XamlFile)) {
+    Write-Error "XAML file not found: $script:XamlFile"
+    return
+}
+
+if (-not (Test-Path $script:HtmlTemplateFile)) {
+    Write-Error "HTML template file not found: $script:HtmlTemplateFile"
+    return
+}
+
+# Load XAML and HTML templates
+try {
+    Write-Host "Loading XAML from: $($script:XamlFile)"
+    $xamlContent = Get-Content -Path $script:XamlFile -Raw -ErrorAction Stop
+    if ([string]::IsNullOrWhiteSpace($xamlContent)) {
+        throw "XAML file is empty"
+    }
+    [xml]$script:XAML = $xamlContent
+    Write-Host "XAML loaded successfully"
+    Write-Log "Loaded XAML template from: $script:XamlFile"
+    
+    Write-Host "Loading HTML template from: $($script:HtmlTemplateFile)"
+    $script:HTMLTemplate = Get-Content -Path $script:HtmlTemplateFile -Raw -ErrorAction Stop
+    if ([string]::IsNullOrWhiteSpace($script:HTMLTemplate)) {
+        throw "HTML template file is empty"
+    }
+    Write-Host "HTML template loaded successfully"
+    Write-Log "Loaded HTML template from: $script:HtmlTemplateFile"
+}
+catch {
+    Write-Error "Error loading resource files: $_"
+    Write-Host "Error details: $($_.Exception.Message)"
+    Write-Host "Stack trace: $($_.ScriptStackTrace)"
+    return
 }
 
 # Function to get the downloads folder path
@@ -319,13 +321,21 @@ function Get-GroupDetails {
         # Create hashtable to store OU statistics
         ${script:OUStats} = @{}
         
-        # First pass - count total groups
+        # First pass - count total groups and track unique groups by DN
+        $uniqueGroups = @{}
         foreach($ou in $SelectedOUs) {
             # Use ErrorAction to handle PS7 error behavior
             $groups = @(Get-ADGroup -Filter * -SearchBase $ou -Properties Description, Info, whenCreated, 
                 managedBy, mail, groupCategory, groupScope, member, memberOf, 
                 DistinguishedName, objectSid, sAMAccountName -ErrorAction Stop)
-            $totalGroups = $totalGroups + $groups.Count
+            
+            # Only count unique groups
+            foreach($group in $groups) {
+                if (-not $uniqueGroups.ContainsKey($group.DistinguishedName)) {
+                    $uniqueGroups[$group.DistinguishedName] = $true
+                    $totalGroups++
+                }
+            }
             
             # Initialize OU stats
             ${script:OUStats}[$ou] = @{
@@ -339,11 +349,11 @@ function Get-GroupDetails {
             }
         }
         
-        Write-Log "Total groups to process: $totalGroups"
+        Write-Log "Total unique groups to process: $totalGroups"
         
         # Track age and size metrics
-        $oldestGroup = $null
-        $largestGroup = $null
+        $script:oldestGroup = $null
+        $script:largestGroup = $null
         $largestMemberCount = 0
         
         foreach($ou in $SelectedOUs) {
@@ -358,6 +368,12 @@ function Get-GroupDetails {
                 if ($script:StopProcessing) {
                     Write-Log "Processing cancelled by user"
                     return $null
+                }
+                
+                # Skip if we've already processed this group
+                if ($allGroups | Where-Object { $_.DN -eq $group.DistinguishedName }) {
+                    Write-Log "Skipping already processed group: $($group.Name)" -NoConsole
+                    continue
                 }
                 
                 $processedGroups++
@@ -384,36 +400,55 @@ function Get-GroupDetails {
                     if ($group.member) {
                         Write-Log "Getting members for group: $($group.Name)" -NoConsole
                         
-                        # Get all user members and their enabled status
-                        $users = Get-ADUser -LDAPFilter "(memberOf=$($group.DistinguishedName))" -Properties Enabled -ResultSetSize $null
-                        $userMembers = if ($users -is [Microsoft.ActiveDirectory.Management.ADPropertyValueCollection]) {
-                            ([array]$users).Count
-                        } else {
-                            if ($null -eq $users) { 0 } else { @($users).Count }
+                        try {
+                            # Get all user members and their enabled status
+                            $users = Get-ADUser -LDAPFilter "(memberOf=$($group.DistinguishedName))" -Properties Enabled,ObjectGUID -ResultSetSize $null -ErrorAction Stop
+                            if ($users) {
+                                $userMembers = if ($users -is [array]) { $users.Count } else { 1 }
+                                
+                                # Track unique enabled and disabled users by their GUIDs
+                                foreach ($user in @($users)) {
+                                    if ($null -ne $user) {
+                                        if ($user.Enabled) {
+                                            $enabledMembers++
+                                            if (${script:OUUniqueUsers}[$ou].Enabled -ne $null) {
+                                                [void]${script:OUUniqueUsers}[$ou].Enabled.Add($user.ObjectGUID.ToString())
+                                            }
+                                        } else {
+                                            $disabledMembers++
+                                            if (${script:OUUniqueUsers}[$ou].Disabled -ne $null) {
+                                                [void]${script:OUUniqueUsers}[$ou].Disabled.Add($user.ObjectGUID.ToString())
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            Start-Sleep -Milliseconds 50
+                            
+                            # Get group members count
+                            $nestedGroups = @(Get-ADGroup -LDAPFilter "(memberOf=$($group.DistinguishedName))" -ResultSetSize $null -ErrorAction Stop)
+                            $groupMembers = if ($nestedGroups) { $nestedGroups.Count } else { 0 }
+                            
+                            Start-Sleep -Milliseconds 50
+                            
+                            # Get computer members count
+                            $computers = @(Get-ADComputer -LDAPFilter "(memberOf=$($group.DistinguishedName))" -ResultSetSize $null -ErrorAction Stop)
+                            $computerMembers = if ($computers) { $computers.Count } else { 0 }
+                            
+                            Start-Sleep -Milliseconds 50
+                            
+                            $totalMembers = $userMembers + $groupMembers + $computerMembers
+                            
+                            # Track largest group
+                            if ($totalMembers -gt $largestMemberCount) {
+                                $largestMemberCount = $totalMembers
+                                $largestGroup = $group
+                            }
                         }
-                        
-                        $enabledMembers = if ($users) {
-                            @($users | Where-Object { $_.Enabled }).Count
-                        } else { 0 }
-                        
-                        $disabledMembers = if ($users) {
-                            @($users | Where-Object { -not $_.Enabled }).Count
-                        } else { 0 }
-                        
-                        Start-Sleep -Milliseconds 50
-                        
-                        $groupMembers = @(Get-ADGroup -LDAPFilter "(memberOf=$($group.DistinguishedName))" -ResultSetSize $null).Count
-                        Start-Sleep -Milliseconds 50
-                        
-                        $computerMembers = @(Get-ADComputer -LDAPFilter "(memberOf=$($group.DistinguishedName))" -ResultSetSize $null).Count
-                        Start-Sleep -Milliseconds 50
-                        
-                        $totalMembers = $userMembers + $groupMembers + $computerMembers
-                        
-                        # Track largest group
-                        if ($totalMembers -gt $largestMemberCount) {
-                            $largestMemberCount = $totalMembers
-                            $largestGroup = $group
+                        catch {
+                            Write-Log "Error getting members for group $($group.Name): $_" -Type Error -NoConsole
+                            # Continue with zero counts if there's an error
                         }
                     }
                     
@@ -427,14 +462,14 @@ function Get-GroupDetails {
                     ${script:OUStats}[$ou].NestedGroupCount = $currentNestedCount + $nestingDepth
                     ${script:OUStats}[$ou].MaxNestingDepth = [Math]::Max([int](${script:OUStats}[$ou].MaxNestingDepth), $nestingDepth)
                     
-                    # Update OU statistics - ensure numeric operations
-                    $currentEnabled = [int](${script:OUStats}[$ou].EnabledMembers)
-                    $currentDisabled = [int](${script:OUStats}[$ou].DisabledMembers)
-                    $currentTotal = [int](${script:OUStats}[$ou].TotalMembers)
-                    
-                    ${script:OUStats}[$ou].EnabledMembers = $currentEnabled + $enabledMembers
-                    ${script:OUStats}[$ou].DisabledMembers = $currentDisabled + $disabledMembers
-                    ${script:OUStats}[$ou].TotalMembers = $currentTotal + $totalMembers
+                    # Update OU statistics with unique user counts
+                    if (${script:OUUniqueUsers}[$ou].Enabled -ne $null) {
+                        ${script:OUStats}[$ou].EnabledMembers = ${script:OUUniqueUsers}[$ou].Enabled.Count
+                    }
+                    if (${script:OUUniqueUsers}[$ou].Disabled -ne $null) {
+                        ${script:OUStats}[$ou].DisabledMembers = ${script:OUUniqueUsers}[$ou].Disabled.Count
+                    }
+                    ${script:OUStats}[$ou].TotalMembers = ${script:OUStats}[$ou].EnabledMembers + ${script:OUStats}[$ou].DisabledMembers
                     
                     # Convert manager CN to UPN if present
                     $managerUPN = if ($group.managedBy) {
@@ -843,6 +878,21 @@ function New-HTMLReport {
             }
             Write-Log "Largest OU: $($largestOUData.Name), Groups: $($largestOUData.Groups)"
 
+            # Calculate percentages
+            $criticalPercent = [Math]::Round(($criticalGroups / $totalGroups) * 100, 1)
+            $warningPercent = [Math]::Round(($warningGroups / $totalGroups) * 100, 1)
+            $healthyPercent = [Math]::Round(($healthyGroups / $totalGroups) * 100, 1)
+            $nestedGroupsPercent = [Math]::Round(($nestedGroups / $totalGroups) * 100, 1)
+            
+            # Calculate member percentages
+            $activeMembersPercent = if ($totalMembers -gt 0) {
+                [Math]::Round(($activeMembers / $totalMembers) * 100, 1)
+            } else { 0 }
+            
+            $disabledMembersPercent = if ($totalMembers -gt 0) {
+                [Math]::Round(($disabledMembers / $totalMembers) * 100, 1)
+            } else { 0 }
+
             $templateData = @{
                 # Report Metadata
                 REPORT_DATE = "Report Generated: $(Get-Date -Format 'MMMM d, yyyy  •  h:mm tt')"
@@ -857,6 +907,9 @@ function New-HTMLReport {
                 CRITICAL_GROUPS = $criticalGroups
                 WARNING_GROUPS = $warningGroups
                 HEALTHY_GROUPS = $healthyGroups
+                CRITICAL_PERCENT = $criticalPercent
+                WARNING_PERCENT = $warningPercent
+                HEALTHY_PERCENT = $healthyPercent
                 
                 # OU Statistics
                 TOTAL_OUS = $ouStats.Count
@@ -867,10 +920,8 @@ function New-HTMLReport {
                 TOTAL_MEMBERS = $totalMembers
                 DISABLED_USERS = $disabledMembers
                 ACTIVE_MEMBERS = $activeMembers
-                USER_DISTRIBUTION = @{
-                    Enabled = $activeMembers
-                    Disabled = $disabledMembers
-                }
+                ACTIVE_MEMBERS_PERCENT = $activeMembersPercent
+                DISABLED_MEMBERS_PERCENT = $disabledMembersPercent
                 
                 # Management Status
                 NO_MANAGER = $noManager
@@ -880,6 +931,7 @@ function New-HTMLReport {
                 
                 # Group Structure
                 NESTED_GROUPS = $nestedGroups
+                NESTED_GROUPS_PERCENT = $nestedGroupsPercent
                 MAX_NESTING_DEPTH = ($Groups | Measure-Object -Property NestingDepth -Maximum).Maximum
                 GROUP_CATEGORIES = "Security: $totalGroups"
                 SCOPE_DISTRIBUTION = "Global: $totalGroups"
