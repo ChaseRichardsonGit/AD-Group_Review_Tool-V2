@@ -23,15 +23,18 @@
         }
         
         .container {
-            max-width: 1600px;
-            margin: 0 auto;
-            background: white;
-            padding: 40px;
-            border-radius: 16px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            max-width: 100%;  /* Allow full width for background */
+            margin: 0;
+            background: var(--bg-color);
+            padding: 40px 0;  /* Remove horizontal padding */
+            border-radius: 0;
+            box-shadow: none;
         }
 
         h1 {
+            max-width: 1400px;
+            margin: 0 auto 32px auto;
+            padding: 0 20px 16px 20px;
             font-size: 32px;
             font-weight: 600;
             color: #1a202c;
@@ -41,10 +44,12 @@
         }
 
         .dashboard {
+            max-width: 1400px;
+            margin: 0 auto 40px auto;
+            padding: 0 20px;
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 24px;
-            margin-bottom: 40px;
         }
 
         .dashboard > .card {
@@ -254,6 +259,8 @@
             background: white;
             border-radius: 8px;
             overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+            border: 1px solid #edf2f7;
         }
 
         th {
@@ -470,19 +477,20 @@
         .ou-stats-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 16px;
+            margin: 16px 0;
             background: white;
             box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             border-radius: 8px;
             overflow: hidden;
+            font-size: 12px;
         }
 
         .ou-stats-table th,
         .ou-stats-table td {
-            padding: 8px 12px;
+            padding: 4px 8px;
             text-align: left;
             border-bottom: 1px solid #e2e8f0;
-            font-size: 13px;
+            line-height: 1.2;
         }
 
         .ou-stats-table th {
@@ -490,29 +498,43 @@
             font-weight: 600;
             color: #2d3748;
             text-align: center;
+            white-space: nowrap;
+            position: sticky;
+            top: 0;
+            z-index: 10;
         }
 
         .ou-stats-table td {
             vertical-align: middle;
         }
 
-        .ou-stats-table th.no-bottom-border {
-            border-bottom: none;
-            padding-bottom: 4px;
+        .ou-stats-table tr:hover {
+            background-color: #f7fafc;
         }
 
-        .ou-stats-table th.top-border {
-            border-top: 1px solid #e2e8f0;
-            padding-top: 4px;
-        }
-
-        .members-cell {
-            text-align: center;
+        .ou-stats-table td:first-child {
+            max-width: 250px;  /* Reduced max-width */
+            overflow: hidden;
+            text-overflow: ellipsis;
             white-space: nowrap;
         }
 
-        .text-center {
+        /* Column specific styles */
+        .ou-stats-table td:nth-child(2),
+        .ou-stats-table td:nth-child(3),
+        .ou-stats-table td:nth-child(4),
+        .ou-stats-table td:nth-child(5),
+        .ou-stats-table td:nth-child(6),
+        .ou-stats-table td:nth-child(7) {
             text-align: center;
+            width: 1%;  /* Make columns as narrow as possible */
+            white-space: nowrap;
+        }
+
+        .members-cell {
+            text-align: center !important;
+            white-space: nowrap;
+            font-variant-numeric: tabular-nums;  /* For better number alignment */
         }
 
         .warning-text {
@@ -525,11 +547,26 @@
             font-weight: 500;
         }
 
-        .ou-stats-table td:first-child {
-            max-width: 300px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+        /* Alternating row colors for better readability */
+        .ou-stats-table tbody tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        /* Compact header styles */
+        .ou-stats-table th.no-bottom-border {
+            border-bottom: none;
+            padding-bottom: 2px;
+        }
+
+        .ou-stats-table th.top-border {
+            border-top: 1px solid #e2e8f0;
+            padding-top: 2px;
+        }
+
+        /* Add subtle divider lines between columns */
+        .ou-stats-table td:not(:last-child),
+        .ou-stats-table th:not(:last-child) {
+            border-right: 1px solid #f0f0f0;
         }
 
         /* Card Styles */
@@ -859,10 +896,12 @@
 
         /* Executive Dashboard Styles */
         .executive-dashboard {
+            max-width: 1400px;
+            margin: 0 auto 40px auto;
+            padding: 0 20px;
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 24px;
-            margin-bottom: 40px;
         }
 
         .metric-card {
@@ -1122,229 +1161,618 @@
             color: #333;
         }
 
-        /* Add spacing between tables */
-        .ou-stats-table {
-            margin-bottom: 2em;
+        /* Parent OU styles */
+        .parent-ou {
+            color: #718096;
+            font-style: italic;
         }
 
-        .filter-section {
-            margin: 1em 0;
+        /* Table container styles */
+        .table-container {
+            max-width: 1400px;  /* Match dashboard width */
+            margin: 0 auto;     /* Center the tables */
+            padding: 0 20px;    /* Add some padding on the sides */
+        }
+
+        /* Group Table Styles */
+        .group-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+            border: 1px solid #edf2f7;
+        }
+
+        .group-table th {
+            background: #f8fafc;
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #2D3748;
+            border-bottom: 2px solid #e2e8f0;
+            white-space: nowrap;
+        }
+
+        .group-table td {
+            padding: 16px;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: top;
+        }
+
+        /* Column Widths */
+        .group-table th:nth-child(1), .group-table td:nth-child(1) { width: 40px; }  /* Expand button */
+        .group-table th:nth-child(2), .group-table td:nth-child(2) { width: 20%; }  /* Group Name */
+        .group-table th:nth-child(3), .group-table td:nth-child(3) { width: 8%; }   /* Health */
+        .group-table th:nth-child(4), .group-table td:nth-child(4) { width: 15%; }  /* Members */
+        .group-table th:nth-child(5), .group-table td:nth-child(5) { width: 25%; }  /* Description */
+        .group-table th:nth-child(6), .group-table td:nth-child(6) { width: 17%; }  /* Manager */
+        .group-table th:nth-child(7), .group-table td:nth-child(7) { width: 15%; }  /* Details */
+
+        .group-table tr:hover {
+            background-color: #f7fafc;
+        }
+
+        /* Group name styles */
+        .group-name {
+            font-weight: 500;
+            color: #2d3748;
+            display: block;
+        }
+
+        .group-sam {
+            font-size: 12px;
+            color: #718096;
+            display: block;
+            margin-top: 4px;
+        }
+
+        /* Health badge styles */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            line-height: 1;
+            white-space: nowrap;
+        }
+
+        /* Member stats styles */
+        .member-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .member-stat {
+            display: inline-flex;
+            align-items: center;
+            font-size: 0.875rem;
+            color: #4a5568;
+        }
+
+        /* Manager info styles */
+        .manager-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .manager-name {
+            font-weight: 600;
+            color: #2d3748;
+        }
+
+        .manager-title {
+            color: #718096;
+            font-size: 0.875rem;
+        }
+
+        /* Details styles */
+        .details-section {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .details-section > div {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            color: #4a5568;
+            font-size: 0.875rem;
+        }
+
+        /* Nested groups styles */
+        .nested-warning {
+            color: var(--warning-color);
+            font-size: 0.875rem;
+            margin-top: 4px;
+        }
+
+        /* Add alternating row colors */
+        .group-table tbody tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        .group-table tbody tr:hover {
+            background-color: #f7fafc;
+        }
+
+        /* Add styles for expandable rows */
+        .group-expand-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 4px;
+            background: #f8fafc;
+            color: #4a5568;
+            cursor: pointer;
+            margin-right: 8px;
+            font-size: 14px;
+            line-height: 1;
+            transition: all 0.2s ease;
+        }
+
+        .group-expand-btn:hover {
+            background: #e2e8f0;
+        }
+
+        .group-expand-btn.expanded {
+            transform: rotate(45deg);
+            background: #e2e8f0;
+        }
+
+        .group-details-row {
+            display: none;
+            background: #f8fafc;
+        }
+
+        .group-details-row.expanded {
+            display: table-row;
+        }
+
+        .group-details-row > td {
+            padding: 0;
+        }
+
+        .group-details-content {
+            padding: 16px 24px;
+            border-bottom: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+
+        .group-details-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .group-detail-section {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .group-detail-section h4 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #2d3748;
+            margin: 0 0 12px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .detail-list {
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .detail-list li {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #4a5568;
+        }
+
+        .detail-list li:last-child {
+            margin-bottom: 0;
+        }
+
+        .detail-label {
+            color: #718096;
+            font-weight: 500;
+        }
+
+        .detail-value {
+            color: #2d3748;
+        }
+
+        .detail-value.warning {
+            color: var(--warning-color);
+        }
+
+        .detail-value.critical {
+            color: var(--critical-color);
+        }
+
+        .detail-value.success {
+            color: var(--success-color);
         }
     </style>
-    <script>
-        function filterGroups(minHealth, maxHealth, button) {
-            const rows = document.querySelectorAll('table tbody tr');
-            rows.forEach(row => {
-                const healthCell = row.querySelector('.health-score');
-                if (healthCell) {
-                    const healthScore = parseInt(healthCell.textContent);
-                    row.style.display = (healthScore >= minHealth && healthScore <= maxHealth) ? '' : 'none';
-                }
-            });
-            
-            // Update active state of filter buttons
-            document.querySelectorAll('.filter-button').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            button.classList.add('active');
-        }
+
+    <!-- Sorting functionality -->
+    <script type="text/javascript">
+        // Initialize template data as a global variable
+        var templateData = {"TOTAL_GROUPS": 100, "AVG_HEALTH": 85.5, /* ... other data ... */};
         
-        function searchGroups() {
-            const searchText = document.getElementById('groupSearch').value.toLowerCase();
-            const rows = document.querySelectorAll('table tbody tr');
-            
-            rows.forEach(row => {
-                const text = row.textContent.toLowerCase();
-                row.style.display = text.includes(searchText) ? '' : 'none';
-            });
-        }
-
-        // Add function to set health progress with validation
-        function setHealthProgress(percentage) {
-            const progressFill = document.querySelector('.progress-fill');
-            if (progressFill) {
-                // Ensure percentage is a valid number between 0 and 100
-                let validPercentage = 0;
-                try {
-                    validPercentage = Math.min(100, Math.max(0, parseFloat(percentage) || 0));
-                } catch (e) {
-                    console.warn('Invalid health percentage:', percentage);
-                }
-                progressFill.style.width = validPercentage + '%';
-            }
-        }
-
-        // Set initial health progress when document loads
         document.addEventListener('DOMContentLoaded', function() {
-            const avgHealth = document.querySelector('.metric-value').textContent;
-            setHealthProgress(avgHealth);
+            if (!templateData) {
+                console.error('Template data not initialized');
+                alert('Error loading report data. Please check the console for details.');
+                return;
+            }
             
-            // Update all numeric values with validation
-            document.querySelectorAll('[data-numeric]').forEach(element => {
-                const value = element.textContent;
-                const defaultValue = element.getAttribute('data-default') || '0';
-                element.textContent = safeParseNumber(value, parseFloat(defaultValue));
-            });
+            // Populate all data fields
+            populateMetrics();
+            populateOUStats();
+            populateGroupTable();
             
-            document.querySelectorAll('.filter-button').forEach(button => {
-                button.addEventListener('click', function() {
-                    const range = this.getAttribute('data-range').split(',');
-                    filterGroups(parseInt(range[0]), parseInt(range[1]), this);
-                });
-            });
+            // Initialize sorting and filtering
+            initializeSorting();
+            initializeFiltering();
             
-            // Calculate and display OU statistics
-            calculateOUStats();
+            // Set health progress
+            setHealthProgress(templateData.AVG_HEALTH);
         });
-        
-        function toggleNestedGroups(button) {
-            const detailsSection = button.nextElementSibling;
-            button.classList.toggle('expanded');
-            detailsSection.classList.toggle('expanded');
-        }
 
-        // Add function to calculate OU statistics
-        function calculateOUStats() {
-            const rows = document.querySelectorAll('.ou-stats-table tbody tr');
-            const stats = {
-                totalOUs: rows.length,
-                totalGroups: 0,
-                maxGroups: 0,
-                maxGroupsOU: '',
-                emptyOUs: 0
-            };
-            
-            rows.forEach(row => {
-                const groupCount = parseInt(row.querySelector('td:nth-child(2)').textContent);
-                stats.totalGroups += groupCount;
-                
-                if (groupCount === 0) {
-                    stats.emptyOUs++;
-                }
-                
-                if (groupCount > stats.maxGroups) {
-                    stats.maxGroups = groupCount;
-                    stats.maxGroupsOU = row.querySelector('td:nth-child(1)').textContent;
-                }
-            });
-            
-            // Update statistics display
-            document.getElementById('totalOUs').textContent = stats.totalOUs;
-            document.getElementById('avgGroupsPerOU').textContent = 
-                (stats.totalGroups / stats.totalOUs).toFixed(1);
-            document.getElementById('maxGroupsOU').textContent = 
-                `${stats.maxGroupsOU} (${stats.maxGroups})`;
-            document.getElementById('emptyOUs').textContent = stats.emptyOUs;
-        }
-
-        function toggleOUPath(button) {
-            button.classList.toggle('expanded');
-            const details = button.parentElement.querySelector('.ou-details');
-            if (details) {
-                details.classList.toggle('expanded');
+        function setHealthProgress(health) {
+            const progressBar = document.querySelector('.health-progress-bar .progress-fill');
+            if (progressBar) {
+                progressBar.style.width = `${health}%`;
             }
         }
 
-        function toggleOUInfo(button) {
-            button.classList.toggle('expanded');
-            const info = button.nextElementSibling;
-            if (info) {
-                info.classList.toggle('expanded');
-            }
+        function populateMetrics() {
+            // Update all metric values using template data
+            document.querySelectorAll('[data-metric]').forEach(element => {
+                const metric = element.getAttribute('data-metric');
+                if (templateData[metric] !== undefined) {
+                    if (metric === 'USER_DISTRIBUTION') {
+                        const dist = typeof templateData[metric] === 'string' ? 
+                            JSON.parse(templateData[metric]) : templateData[metric];
+                        element.textContent = `Enabled: ${dist.Enabled}, Disabled: ${dist.Disabled}`;
+                    } else {
+                        element.textContent = templateData[metric];
+                    }
+                }
+            });
+
+            // Update percentage values
+            document.querySelectorAll('.management-percent').forEach(element => {
+                const text = element.textContent;
+                if (text.includes('NO_MANAGER_PERCENT')) {
+                    element.textContent = `(${templateData.NO_MANAGER_PERCENT}%)`;
+                } else if (text.includes('NO_DESCRIPTION_PERCENT')) {
+                    element.textContent = `(${templateData.NO_DESCRIPTION_PERCENT}%)`;
+                }
+            });
         }
 
-        document.addEventListener('DOMContentLoaded', function() {
-            // Filter functionality
-            document.querySelectorAll('.filter-button').forEach(button => {
-                button.addEventListener('click', function() {
-                    // Remove active class from all buttons
-                    document.querySelectorAll('.filter-button').forEach(btn => {
-                        btn.classList.remove('active');
-                    });
-                    
-                    // Add active class to clicked button
-                    this.classList.add('active');
-                    
-                    const filter = this.getAttribute('data-filter');
-                    const rows = document.querySelectorAll('tbody tr');
-                    
-                    rows.forEach(row => {
-                        const healthScore = parseInt(row.getAttribute('data-health') || '0');
-                        
-                        switch(filter) {
-                            case 'critical':
-                                row.style.display = healthScore < 40 ? '' : 'none';
-                                break;
-                            case 'warning':
-                                row.style.display = (healthScore >= 40 && healthScore < 70) ? '' : 'none';
-                                break;
-                            case 'healthy':
-                                row.style.display = healthScore >= 70 ? '' : 'none';
-                                break;
-                            default: // 'all'
-                                row.style.display = '';
-                        }
-                    });
-                });
-            });
-
-            // Search functionality
-            document.getElementById('groupSearch').addEventListener('input', function() {
-                const searchText = this.value.toLowerCase();
-                const rows = document.querySelectorAll('tbody tr');
-                
-                rows.forEach(row => {
-                    const text = row.textContent.toLowerCase();
-                    row.style.display = text.includes(searchText) ? '' : 'none';
-                });
-            });
-
-            // Sorting functionality
-            document.querySelectorAll('th.sortable').forEach(headerCell => {
-                headerCell.addEventListener('click', function() {
-                    const table = this.closest('table');
+        function initializeSorting() {
+            document.querySelectorAll('th.sortable').forEach(th => {
+                th.addEventListener('click', () => {
+                    const table = th.closest('table');
                     const tbody = table.querySelector('tbody');
-                    const rows = Array.from(tbody.querySelectorAll('tr'));
-                    const columnIndex = Array.from(this.parentNode.children).indexOf(this);
-                    const isNumeric = rows.some(row => !isNaN(row.children[columnIndex].textContent.trim()));
+                    const rows = Array.from(tbody.querySelectorAll('tr:not(.group-details-row)'));
+                    const index = Array.from(th.parentNode.children).indexOf(th);
+                    const isAsc = !th.classList.contains('sorted-asc');
                     
-                    // Toggle sort direction
-                    const currentDir = this.getAttribute('data-sort') || 'asc';
-                    const newDir = currentDir === 'asc' ? 'desc' : 'asc';
-                    
-                    // Remove sort indicators from all headers
-                    table.querySelectorAll('th').forEach(th => {
-                        th.removeAttribute('data-sort');
-                        th.classList.remove('sorted-asc', 'sorted-desc');
+                    // Remove sorted classes from all headers
+                    th.parentNode.querySelectorAll('th').forEach(header => {
+                        header.classList.remove('sorted-asc', 'sorted-desc');
                     });
                     
-                    // Add sort indicator to current header
-                    this.setAttribute('data-sort', newDir);
-                    this.classList.add(`sorted-${newDir}`);
+                    // Add appropriate sort class
+                    th.classList.add(isAsc ? 'sorted-asc' : 'sorted-desc');
                     
                     // Sort rows
                     rows.sort((a, b) => {
-                        let aVal = a.children[columnIndex].textContent.trim();
-                        let bVal = b.children[columnIndex].textContent.trim();
-                        
-                        if (isNumeric) {
-                            aVal = parseFloat(aVal) || 0;
-                            bVal = parseFloat(bVal) || 0;
+                        const aValue = getCellValue(a.cells[index]);
+                        const bValue = getCellValue(b.cells[index]);
+                        return isAsc ? compareValues(aValue, bValue) : compareValues(bValue, aValue);
+                    }).forEach(row => {
+                        tbody.appendChild(row);
+                        // Move details row if it exists
+                        const detailsRow = tbody.querySelector(`tr.group-details-row[data-group-id="${row.getAttribute('data-group-id')}"]`);
+                        if (detailsRow) {
+                            tbody.appendChild(detailsRow);
                         }
-                        
-                        if (aVal < bVal) return newDir === 'asc' ? -1 : 1;
-                        if (aVal > bVal) return newDir === 'asc' ? 1 : -1;
-                        return 0;
                     });
-                    
-                    // Reorder rows
-                    rows.forEach(row => tbody.appendChild(row));
                 });
             });
-        });
+        }
+
+        function initializeFiltering() {
+            const filterButtons = document.querySelectorAll('.filter-button');
+            filterButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    // Remove active class from all buttons
+                    filterButtons.forEach(btn => btn.classList.remove('active'));
+                    // Add active class to clicked button
+                    button.classList.add('active');
+                    
+                    const [min, max] = button.getAttribute('data-range').split(',').map(Number);
+                    filterGroups(min, max);
+                });
+            });
+
+            // Initialize search
+            const searchBox = document.getElementById('groupSearch');
+            if (searchBox) {
+                searchBox.addEventListener('input', () => {
+                    const searchText = searchBox.value.toLowerCase();
+                    searchGroups(searchText);
+                });
+            }
+        }
+
+        function filterGroups(minHealth, maxHealth) {
+            const rows = document.querySelectorAll('.group-table tbody tr:not(.group-details-row)');
+            rows.forEach(row => {
+                const healthCell = row.querySelector('.badge');
+                if (healthCell) {
+                    const health = parseInt(healthCell.textContent);
+                    const show = health >= minHealth && health <= maxHealth;
+                    row.style.display = show ? '' : 'none';
+                    // Hide/show details row if expanded
+                    const detailsRow = row.nextElementSibling;
+                    if (detailsRow && detailsRow.classList.contains('group-details-row')) {
+                        detailsRow.style.display = show && detailsRow.classList.contains('expanded') ? 'table-row' : 'none';
+                    }
+                }
+            });
+        }
+
+        function searchGroups(searchText) {
+            const rows = document.querySelectorAll('.group-table tbody tr:not(.group-details-row)');
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const show = text.includes(searchText);
+                row.style.display = show ? '' : 'none';
+                // Hide/show details row if expanded
+                const detailsRow = row.nextElementSibling;
+                if (detailsRow && detailsRow.classList.contains('group-details-row')) {
+                    detailsRow.style.display = show && detailsRow.classList.contains('expanded') ? 'table-row' : 'none';
+                }
+            });
+        }
+
+        function toggleGroupDetails(button, groupId) {
+            const row = button.closest('tr');
+            const detailsRow = row.nextElementSibling;
+            
+            if (detailsRow && detailsRow.classList.contains('group-details-row')) {
+                const isExpanded = detailsRow.classList.toggle('expanded');
+                button.classList.toggle('expanded', isExpanded);
+                button.textContent = isExpanded ? '-' : '+';
+            }
+        }
+
+        function getCellValue(cell) {
+            // Check for data-value attribute first
+            if (cell.hasAttribute('data-value')) {
+                return parseFloat(cell.getAttribute('data-value'));
+            }
+            // Get text content
+            const text = cell.textContent.trim();
+            // Try to parse as number if possible
+            return isNaN(text) ? text.toLowerCase() : parseFloat(text);
+        }
+
+        function compareValues(a, b) {
+            if (typeof a === 'number' && typeof b === 'number') {
+                return a - b;
+            }
+            return String(a).localeCompare(String(b));
+        }
+
+        function escapeHtml(unsafe) {
+            if (unsafe === null || unsafe === undefined) return '';
+            return unsafe
+                .toString()
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function populateOUStats() {
+            const tbody = document.querySelector('.ou-stats-table tbody');
+            tbody.innerHTML = '';
+            
+            templateData.OU_STATS.forEach(stat => {
+                const row = document.createElement('tr');
+                
+                // Add classes based on thresholds
+                const disabledClass = stat.DisabledPercentage > 40 ? 'critical-text' : 
+                                    stat.DisabledPercentage > 20 ? 'warning-text' : '';
+                const nestingClass = stat.MaxNestingDepth > 10 ? 'critical-text' : 
+                                   stat.MaxNestingDepth > 5 ? 'warning-text' : '';
+                
+                row.innerHTML = `
+                    <td>${escapeHtml(stat.CurrentOU)}</td>
+                    <td class="parent-ou">${escapeHtml(stat.ParentOU)}</td>
+                    <td class="members-cell">${stat.GroupCount}</td>
+                    <td class="members-cell">${stat.EnabledMembers} / ${stat.DisabledMembers}</td>
+                    <td class="members-cell">${stat.TotalMembers}</td>
+                    <td class="members-cell ${disabledClass}" data-value="${stat.DisabledPercentage}">${stat.DisabledPercentage}%</td>
+                    <td class="members-cell">${stat.NestedGroupCount}</td>
+                    <td class="members-cell ${nestingClass}">${stat.MaxNestingDepth}</td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+        
+        function populateGroupTable() {
+            const tbody = document.querySelector('.group-table tbody');
+            tbody.innerHTML = '';
+            
+            templateData.GROUPS.forEach(group => {
+                // Create main row
+                const mainRow = document.createElement('tr');
+                mainRow.innerHTML = `
+                    <td>
+                        <button class="group-expand-btn" onclick="toggleGroupDetails(this, '${escapeHtml(group.ID)}')">+</button>
+                    </td>
+                    <td>
+                        <strong class="group-name">${escapeHtml(group.Name)}</strong>
+                        <div class="group-sam">${escapeHtml(group.SamAccountName)}</div>
+                    </td>
+                    <td>
+                        <span class="badge ${group.HealthClass}">${group.HealthScore}</span>
+                    </td>
+                    <td>
+                        <div class="member-stats">
+                            <span class="member-stat">Total: ${group.TotalMembers}</span>
+                            <span class="member-stat">Users: ${group.UserMembers}</span>
+                            <span class="member-stat">Groups: ${group.GroupMembers}</span>
+                            <span class="member-stat">Computers: ${group.ComputerMembers}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <div>${escapeHtml(group.Description || '')}</div>
+                        ${group.HealthIssues.map(issue => `
+                            <div class="issues-list">
+                                <div>• ${escapeHtml(issue)}</div>
+                            </div>
+                        `).join('')}
+                    </td>
+                    <td>
+                        ${group.Manager ? `
+                            <div class="manager-info">
+                                <span class="manager-name">${escapeHtml(group.Manager.DisplayName)}</span>
+                                <span class="manager-title">${escapeHtml(group.Manager.Title)}</span>
+                                <span class="manager-upn">${escapeHtml(group.Manager.UPN)}</span>
+                            </div>
+                        ` : `
+                            <div class="health-critical">No manager assigned</div>
+                        `}
+                    </td>
+                    <td>
+                        <div>Category: ${escapeHtml(group.Category)}</div>
+                        <div>Scope: ${escapeHtml(group.Scope)}</div>
+                        <div>Created: ${group.Created}</div>
+                    </td>
+                `;
+                
+                // Create details row
+                const detailsRow = document.createElement('tr');
+                detailsRow.className = 'group-details-row';
+                detailsRow.innerHTML = `
+                    <td colspan="7">
+                        <div class="group-details-content">
+                            <div class="group-details-grid">
+                                <!-- Group Structure -->
+                                <div class="group-detail-section">
+                                    <h4>Group Structure</h4>
+                                    <ul class="detail-list">
+                                        <li>
+                                            <span class="detail-label">Parent Groups:</span>
+                                            <span class="detail-value">${group.ParentGroups.map(g => escapeHtml(g)).join(', ') || 'None'}</span>
+                                        </li>
+                                        <li>
+                                            <span class="detail-label">Nested Groups:</span>
+                                            <span class="detail-value">${group.NestedGroups.map(g => escapeHtml(g)).join(', ') || 'None'}</span>
+                                        </li>
+                                        <li>
+                                            <span class="detail-label">Nesting Level:</span>
+                                            <span class="detail-value ${group.NestingWarning ? 'warning' : ''}">${group.NestingDepth} levels</span>
+                                        </li>
+                                        <li>
+                                            <span class="detail-label">Distinguished Name:</span>
+                                            <span class="detail-value">${escapeHtml(group.DN)}</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <!-- Membership Analysis -->
+                                <div class="group-detail-section">
+                                    <h4>Membership Analysis</h4>
+                                    <ul class="detail-list">
+                                        <li>
+                                            <span class="detail-label">Total Members:</span>
+                                            <span class="detail-value">${group.TotalMembers}</span>
+                                        </li>
+                                        <li>
+                                            <span class="detail-label">User Distribution:</span>
+                                            <span class="detail-value">Enabled: ${group.EnabledUsers} / Disabled: ${group.DisabledUsers}</span>
+                                        </li>
+                                        <li>
+                                            <span class="detail-label">Group Members:</span>
+                                            <span class="detail-value ${group.HasNestedGroups ? 'warning' : ''}">${group.GroupMembers} groups</span>
+                                        </li>
+                                        <li>
+                                            <span class="detail-label">Computer Members:</span>
+                                            <span class="detail-value">${group.ComputerMembers} computers</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                                <!-- Health & Configuration -->
+                                <div class="group-detail-section">
+                                    <h4>Health & Configuration</h4>
+                                    <ul class="detail-list">
+                                        <li>
+                                            <span class="detail-label">Health Score:</span>
+                                            <span class="detail-value ${group.HealthClass}">${group.HealthScore}</span>
+                                        </li>
+                                        <li>
+                                            <span class="detail-label">Created Date:</span>
+                                            <span class="detail-value">${group.Created}</span>
+                                        </li>
+                                        <li>
+                                            <span class="detail-label">Group Type:</span>
+                                            <span class="detail-value">${group.Category} - ${group.Scope}</span>
+                                        </li>
+                                        ${group.Email ? `
+                                        <li>
+                                            <span class="detail-label">Email Address:</span>
+                                            <span class="detail-value">${escapeHtml(group.Email)}</span>
+                                        </li>
+                                        ` : ''}
+                                        ${group.HealthIssues.map(issue => `
+                                        <li>
+                                            <span class="detail-label">Health Issue:</span>
+                                            <span class="detail-value critical">• ${escapeHtml(issue)}</span>
+                                        </li>
+                                        `).join('')}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                `;
+                
+                tbody.appendChild(mainRow);
+                tbody.appendChild(detailsRow);
+            });
+        }
     </script>
 </head>
-<body data-health-percentage="{1}">
+<body>
     <div class="container">
         <h1>AD Group Health Report</h1>
         
@@ -1363,16 +1791,16 @@
                 <div class="metric-grid">
                     <div class="metric-item">
                         <span class="metric-label">Total Groups</span>
-                        <span class="metric-value">{{TOTAL_GROUPS}}</span>
+                        <span class="metric-value" data-metric="TOTAL_GROUPS"></span>
                     </div>
                     <div class="metric-item">
                         <span class="metric-label">Empty Groups</span>
-                        <span class="metric-value">{{EMPTY_GROUPS}}</span>
+                        <span class="metric-value" data-metric="EMPTY_GROUPS"></span>
                     </div>
                 </div>
                 <div class="metric-trend">
                     <span class="trend-label">Group Density:</span>
-                    <span class="trend-value">{{AVG_GROUPS_PER_OU}} per OU</span>
+                    <span class="trend-value"><span data-metric="AVG_GROUPS_PER_OU"></span> per OU</span>
                 </div>
             </div>
 
@@ -1389,11 +1817,11 @@
                 <div class="metric-grid">
                     <div class="metric-item">
                         <span class="metric-label">Average Health</span>
-                        <span class="metric-value">{{AVG_HEALTH}}</span>
+                        <span class="metric-value" data-metric="AVG_HEALTH"></span>
                     </div>
                     <div class="metric-item">
                         <span class="metric-label">Critical Groups</span>
-                        <span class="metric-value critical">{{CRITICAL_GROUPS}}</span>
+                        <span class="metric-value critical" data-metric="CRITICAL_GROUPS"></span>
                     </div>
                 </div>
                 <div class="health-progress-bar">
@@ -1414,16 +1842,16 @@
                 <div class="metric-grid">
                     <div class="metric-item">
                         <span class="metric-label">Total OUs</span>
-                        <span class="metric-value">{{TOTAL_OUS}}</span>
+                        <span class="metric-value" data-metric="TOTAL_OUS"></span>
                     </div>
                     <div class="metric-item">
                         <span class="metric-label">Empty OUs</span>
-                        <span class="metric-value warning">{{EMPTY_OUS}}</span>
+                        <span class="metric-value warning" data-metric="EMPTY_OUS"></span>
                     </div>
                 </div>
                 <div class="metric-trend">
                     <span class="trend-label">Most Populated:</span>
-                    <span class="trend-value">{{MAX_GROUPS_OU}}</span>
+                    <span class="trend-value" data-metric="MAX_GROUPS_OU"></span>
                 </div>
             </div>
 
@@ -1432,7 +1860,7 @@
                 <div class="metric-header">
                     <div class="metric-icon">
                         <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+                            <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3z"/>
                         </svg>
                     </div>
                     <h3 class="metric-title">User Distribution</h3>
@@ -1440,16 +1868,16 @@
                 <div class="metric-grid">
                     <div class="metric-item">
                         <span class="metric-label">Total Members</span>
-                        <span class="metric-value">{{TOTAL_MEMBERS}}</span>
+                        <span class="metric-value" data-metric="TOTAL_MEMBERS"></span>
                     </div>
                     <div class="metric-item">
                         <span class="metric-label">Disabled Users</span>
-                        <span class="metric-value warning">{{DISABLED_USERS}}</span>
+                        <span class="metric-value warning" data-metric="DISABLED_USERS"></span>
                     </div>
                 </div>
                 <div class="metric-trend">
                     <span class="trend-label">Member Types:</span>
-                    <span class="trend-value">{{USER_DISTRIBUTION}}</span>
+                    <span class="trend-value" data-metric="USER_DISTRIBUTION"></span>
                 </div>
             </div>
 
@@ -1472,7 +1900,7 @@
                         </div>
                         <div class="management-details">
                             <span class="management-label">Groups Without Managers</span>
-                            <span class="management-value">{{NO_MANAGER}}</span>
+                            <span class="management-value" data-metric="NO_MANAGER"></span>
                             <span class="management-percent">({{NO_MANAGER_PERCENT}}%)</span>
                         </div>
                     </div>
@@ -1484,7 +1912,7 @@
                         </div>
                         <div class="management-details">
                             <span class="management-label">Missing Descriptions</span>
-                            <span class="management-value">{{NO_DESCRIPTION}}</span>
+                            <span class="management-value" data-metric="NO_DESCRIPTION"></span>
                             <span class="management-percent">({{NO_DESCRIPTION_PERCENT}}%)</span>
                         </div>
                     </div>
@@ -1510,8 +1938,8 @@
                         </div>
                             <div class="structure-details">
                                 <span class="structure-label">Nested Groups</span>
-                                <span class="structure-value">{{NESTED_GROUPS}}</span>
-                                <span class="structure-info">Max Depth: {{MAX_NESTING_DEPTH}}</span>
+                                <span class="structure-value" data-metric="NESTED_GROUPS"></span>
+                                <span class="structure-info">Max Depth: <span data-metric="MAX_NESTING_DEPTH"></span></span>
                             </div>
                         </div>
                         <div class="structure-item">
@@ -1522,8 +1950,8 @@
                             </div>
                             <div class="structure-details">
                                 <span class="structure-label">Group Categories</span>
-                                <span class="structure-value">{{GROUP_CATEGORIES}}</span>
-                                <span class="structure-info">{{SCOPE_DISTRIBUTION}}</span>
+                                <span class="structure-value" data-metric="GROUP_CATEGORIES"></span>
+                                <span class="structure-info" data-metric="SCOPE_DISTRIBUTION"></span>
                             </div>
                         </div>
                     </div>
@@ -1531,99 +1959,55 @@
             </div>
         </div>
 
-        <!-- Top Row - 3 Column Layout -->
-        <div class="dashboard" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 24px;">
-            <!-- Overview Card -->
-            <div class="card">
-                <h2>Overview</h2>
-                <div class="stat">
-                    <span class="stat-label">Total Groups</span>
-                    <span class="stat-value" data-numeric data-default="0">{{TOTAL_GROUPS}}</span>
-                    <div class="stat-icon-container">
-                        <svg class="stat-icon" viewBox="0 0 24 24">
-                            <path fill="currentColor" d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2z"/>
-                        </svg>
-                    </div>
-                </div>
-                <div class="stat">
-                    <span class="stat-label">Average Health</span>
-                    <span class="stat-value health" data-numeric data-default="0">{{AVG_HEALTH}}</span>
-                    <div class="stat-icon-container">
-                        <svg class="stat-icon" viewBox="0 0 24 24">
-                            <path fill="currentColor" d="M19.03 7.39l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.48 9-9c0-2.12-.74-4.07-1.97-5.61zM13 14h-2V8h2v6z"/>
-                        </svg>
-                    </div>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill health-progress"></div>
-                </div>
+        <div class="table-container">
+            <!-- OU Statistics Table -->
+            <table class="ou-stats-table sortable">
+                <thead>
+                    <tr>
+                        <th class="sortable">Organizational Unit</th>
+                        <th class="sortable">Parent OU</th>
+                        <th class="sortable">Groups</th>
+                        <th class="sortable">Enabled/Disabled</th>
+                        <th class="sortable">Total Members</th>
+                        <th class="sortable">Disabled %</th>
+                        <th class="sortable">Nested Groups</th>
+                        <th class="sortable">Max Depth</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Populated by JavaScript -->
+                </tbody>
+            </table>
+
+            <!-- Filter Controls -->
+            <div class="filter-section">
+                <button class="filter-button active" data-range="0,100">All Groups (<span data-metric="TOTAL_GROUPS"></span>)</button>
+                <button class="filter-button" data-range="0,50">Critical (<span data-metric="CRITICAL_GROUPS"></span>)</button>
+                <button class="filter-button" data-range="51,80">Warning (<span data-metric="WARNING_GROUPS"></span>)</button>
+                <button class="filter-button" data-range="81,100">Healthy (<span data-metric="HEALTHY_GROUPS"></span>)</button>
             </div>
-            
-            <!-- Health Distribution Card -->
-            <div class="card">
-                <h2>Health Distribution</h2>
-                <div class="health-distribution">
-                    <div class="health-segment critical">
-                        <div>Critical</div>
-                        <strong data-numeric data-default="0">{{CRITICAL_GROUPS}}</strong>
-                    </div>
-                    <div class="health-segment warning">
-                        <div>Warning</div>
-                        <strong data-numeric data-default="0">{{WARNING_GROUPS}}</strong>
-                    </div>
-                    <div class="health-segment healthy">
-                        <div>Healthy</div>
-                        <strong data-numeric data-default="0">{{HEALTHY_GROUPS}}</strong>
-                    </div>
-                </div>
-            </div>
+
+            <!-- Search Box -->
+            <input type="text" id="groupSearch" class="search-box" placeholder="Search groups..." oninput="searchGroups()">
+
+            <!-- Group Table -->
+            <table class="group-table sortable">
+                <thead>
+                    <tr>
+                        <th style="width: 40px"></th>
+                        <th class="sortable">Group Name</th>
+                        <th class="sortable">Health</th>
+                        <th class="sortable">Members</th>
+                        <th class="sortable">Description & Issues</th>
+                        <th class="sortable">Manager</th>
+                        <th class="sortable">Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Populated by JavaScript -->
+                </tbody>
+            </table>
         </div>
-
-        <!-- OU Statistics Table -->
-        <table class="ou-stats-table sortable">
-            <thead>
-                <tr>
-                    <th class="sortable">Organizational Unit</th>
-                    <th class="sortable">Groups</th>
-                    <th class="sortable">Enabled/Disabled</th>
-                    <th class="sortable">Total Members</th>
-                    <th class="sortable">Disabled %</th>
-                    <th class="sortable">Nested Groups</th>
-                    <th class="sortable">Max Depth</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{OU_STATS_ROWS}}
-            </tbody>
-        </table>
-
-        <!-- Filter Controls -->
-        <div class="filter-section">
-            <button class="filter-button active" data-filter="all">All Groups ({{TOTAL_GROUPS}})</button>
-            <button class="filter-button" data-filter="critical">Critical ({{CRITICAL_GROUPS}})</button>
-            <button class="filter-button" data-filter="warning">Warning ({{WARNING_GROUPS}})</button>
-            <button class="filter-button" data-filter="healthy">Healthy ({{HEALTHY_GROUPS}})</button>
-        </div>
-
-        <!-- Search Box -->
-        <input type="text" id="groupSearch" class="search-box" placeholder="Search groups..." oninput="searchGroups()">
-
-        <!-- Group Table -->
-        <table class="group-table sortable">
-            <thead>
-                <tr>
-                    <th class="sortable">Group Name</th>
-                    <th class="sortable">Health</th>
-                    <th class="sortable">Members</th>
-                    <th class="sortable">Description</th>
-                    <th class="sortable">Manager</th>
-                    <th class="sortable">Details</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{GROUP_ROWS}}
-            </tbody>
-        </table>
     </div>
 </body>
 </html> 
