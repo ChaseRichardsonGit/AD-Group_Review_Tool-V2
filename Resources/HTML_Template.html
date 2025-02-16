@@ -517,13 +517,14 @@
         /* OU Statistics Table Styles */
         .ou-stats-table {
             width: 100%;
-            border-collapse: collapse;
-            margin: 16px 0;
+            border-collapse: separate;
+            border-spacing: 0;
+            margin: 24px 0;
             background: white;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
             border-radius: 8px;
             overflow: hidden;
-            font-size: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border: 2px solid #e2e8f0;
         }
 
         .ou-stats-table th,
@@ -1467,10 +1468,10 @@
     <!-- Sorting functionality -->
     <script type="text/javascript">
         // Initialize template data as a global variable
-        var templateData = {"TOTAL_GROUPS": 100, "AVG_HEALTH": 85.5, /* ... other data ... */};
+        var templateData = {};  // Will be populated by PowerShell
         
         document.addEventListener('DOMContentLoaded', function() {
-            if (!templateData) {
+            if (!templateData || Object.keys(templateData).length === 0) {
                 console.error('Template data not initialized');
                 alert('Error loading report data. Please check the console for details.');
                 return;
@@ -1505,6 +1506,12 @@
                         const dist = typeof templateData[metric] === 'string' ? 
                             JSON.parse(templateData[metric]) : templateData[metric];
                         element.textContent = `Enabled: ${dist.Enabled}, Disabled: ${dist.Disabled}`;
+                    } else if (metric.includes('.')) {
+                        // Handle nested properties (e.g., 'OLDEST_GROUP.Name')
+                        const [parent, child] = metric.split('.');
+                        if (templateData[parent] && templateData[parent][child] !== undefined) {
+                            element.textContent = templateData[parent][child];
+                        }
                     } else {
                         element.textContent = templateData[metric];
                     }

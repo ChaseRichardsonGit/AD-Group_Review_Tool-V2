@@ -301,7 +301,7 @@ function Get-NestedGroupMembership {
     }
 }
 
-# Update the group details collection to include nested group information
+# Function to get group details
 function Get-GroupDetails {
     param(
         [string[]]$SelectedOUs
@@ -322,7 +322,9 @@ function Get-GroupDetails {
         # First pass - count total groups
         foreach($ou in $SelectedOUs) {
             # Use ErrorAction to handle PS7 error behavior
-            $groups = @(Get-ADGroup -Filter * -SearchBase $ou -ErrorAction Stop)
+            $groups = @(Get-ADGroup -Filter * -SearchBase $ou -Properties Description, Info, whenCreated, 
+                managedBy, mail, groupCategory, groupScope, member, memberOf, 
+                DistinguishedName, objectSid, sAMAccountName -ErrorAction Stop)
             $totalGroups = $totalGroups + $groups.Count
             
             # Initialize OU stats
@@ -338,6 +340,11 @@ function Get-GroupDetails {
         }
         
         Write-Log "Total groups to process: $totalGroups"
+        
+        # Track age and size metrics
+        $oldestGroup = $null
+        $largestGroup = $null
+        $largestMemberCount = 0
         
         foreach($ou in $SelectedOUs) {
             Write-Log "Processing OU: $ou"
@@ -365,11 +372,6 @@ function Get-GroupDetails {
                     } else {
                         if ($null -eq $nestedGroups) { 0 } else { @($nestedGroups).Count }
                     }
-                    
-                    # Update OU statistics for nested groups - ensure numeric operations
-                    $currentNestedCount = [int](${script:OUStats}[$ou].NestedGroupCount)
-                    ${script:OUStats}[$ou].NestedGroupCount = $currentNestedCount + $nestingDepth
-                    ${script:OUStats}[$ou].MaxNestingDepth = [Math]::Max([int](${script:OUStats}[$ou].MaxNestingDepth), $nestingDepth)
                     
                     # Initialize member counts
                     $userMembers = 0
@@ -408,15 +410,31 @@ function Get-GroupDetails {
                         
                         $totalMembers = $userMembers + $groupMembers + $computerMembers
                         
-                        # Update OU statistics - ensure numeric operations
-                        $currentEnabled = [int](${script:OUStats}[$ou].EnabledMembers)
-                        $currentDisabled = [int](${script:OUStats}[$ou].DisabledMembers)
-                        $currentTotal = [int](${script:OUStats}[$ou].TotalMembers)
-                        
-                        ${script:OUStats}[$ou].EnabledMembers = $currentEnabled + $enabledMembers
-                        ${script:OUStats}[$ou].DisabledMembers = $currentDisabled + $disabledMembers
-                        ${script:OUStats}[$ou].TotalMembers = $currentTotal + $totalMembers
+                        # Track largest group
+                        if ($totalMembers -gt $largestMemberCount) {
+                            $largestMemberCount = $totalMembers
+                            $largestGroup = $group
+                        }
                     }
+                    
+                    # Track oldest group
+                    if ($null -eq $oldestGroup -or $group.whenCreated -lt $oldestGroup.whenCreated) {
+                        $oldestGroup = $group
+                    }
+                    
+                    # Update OU statistics for nested groups - ensure numeric operations
+                    $currentNestedCount = [int](${script:OUStats}[$ou].NestedGroupCount)
+                    ${script:OUStats}[$ou].NestedGroupCount = $currentNestedCount + $nestingDepth
+                    ${script:OUStats}[$ou].MaxNestingDepth = [Math]::Max([int](${script:OUStats}[$ou].MaxNestingDepth), $nestingDepth)
+                    
+                    # Update OU statistics - ensure numeric operations
+                    $currentEnabled = [int](${script:OUStats}[$ou].EnabledMembers)
+                    $currentDisabled = [int](${script:OUStats}[$ou].DisabledMembers)
+                    $currentTotal = [int](${script:OUStats}[$ou].TotalMembers)
+                    
+                    ${script:OUStats}[$ou].EnabledMembers = $currentEnabled + $enabledMembers
+                    ${script:OUStats}[$ou].DisabledMembers = $currentDisabled + $disabledMembers
+                    ${script:OUStats}[$ou].TotalMembers = $currentTotal + $totalMembers
                     
                     # Convert manager CN to UPN if present
                     $managerUPN = if ($group.managedBy) {
@@ -471,6 +489,15 @@ function Get-GroupDetails {
                     $health = Get-GroupHealth $groupObj
                     $groupObj | Add-Member -NotePropertyName HealthScore -NotePropertyValue $health.Score
                     $groupObj | Add-Member -NotePropertyName HealthIssues -NotePropertyValue $health.Issues
+
+                    # Add nested group warning to health issues if present
+                    if ($groupObj.HasNestedGroups) {
+                        $nestedWarning = "Contains nested groups ($($groupObj.GroupMembers) groups) - Click + for details"
+                        if ($groupObj.HealthIssues -isnot [System.Collections.ArrayList]) {
+                            $groupObj.HealthIssues = [System.Collections.ArrayList]@($groupObj.HealthIssues)
+                        }
+                        [void]$groupObj.HealthIssues.Add($nestedWarning)
+                    }
                     
                     [void]$allGroups.Add($groupObj)
                 }
@@ -574,11 +601,66 @@ function New-HTMLReport {
             
             $healthyGroups = @($Groups | Where-Object { $_.HealthScore -gt 80 } | Sort-Object -Unique DN).Count
             Write-Log "Healthy Groups: $healthyGroups"
+
+            # Calculate oldest group
+            $oldestGroup = $Groups | Sort-Object Created | Select-Object -First 1
+            Write-Log "Found oldest group: $($oldestGroup.Name)"
+
+            # Calculate largest group
+            $largestGroup = $Groups | Sort-Object TotalMembers -Descending | Select-Object -First 1
+            Write-Log "Found largest group: $($largestGroup.Name)"
+
+            # Calculate largest OU
+            $largestOU = ${script:OUStats}.GetEnumerator() | 
+                Sort-Object { $_.Value.GroupCount } -Descending | 
+                Select-Object -First 1
+            Write-Log "Found largest OU: $($largestOU.Key)"
+
+            $ouStats = ${script:OUStats}.GetEnumerator() | ForEach-Object {
+                $fullDN = $_.Key
+                $stats = $_.Value
+                Write-Log "Processing OU: $fullDN" -NoConsole
+                
+                # Split DN and get OU parts
+                $parts = $fullDN -split ',' | Where-Object { $_ -match '^(OU|DC)=' }
+                $ouParts = @($parts | Where-Object { $_ -match '^OU=' })
+                $currentOU = ($ouParts[0] -replace '^OU=','').Trim()
+                $parentOU = if ($ouParts.Count -gt 1) {
+                    ($ouParts[1] -replace '^OU=','').Trim()
+                } else { $null }
+                
+                # Check if this is a child OU
+                $isChildOU = -not (${script:OUStats}.Keys | Where-Object { 
+                    $_ -ne $fullDN -and $_ -like "*,$fullDN"
+                })
+                
+                if ($isChildOU) {
+                    Write-Log "Found child OU: $currentOU" -NoConsole
+                    $disabledPercentage = if ($stats.TotalMembers -gt 0) {
+                        [math]::Round(($stats.DisabledMembers / $stats.TotalMembers) * 100, 1)
+                    } else { 0 }
+                    
+                    @{
+                        CurrentOU = $currentOU
+                        ParentOU = $parentOU
+                        FullDN = $fullDN
+                        GroupCount = $stats.GroupCount
+                        EnabledMembers = $stats.EnabledMembers
+                        DisabledMembers = $stats.DisabledMembers
+                        TotalMembers = ($stats.EnabledMembers + $stats.DisabledMembers)
+                        DisabledPercentage = $disabledPercentage
+                        NestedGroupCount = $stats.NestedGroupCount
+                        MaxNestingDepth = $stats.MaxNestingDepth
+                    }
+                }
+            } | Where-Object { $_ -ne $null } | Sort-Object { $_.GroupCount } -Descending
+            
+            Write-Log "Processed $(($ouStats | Measure-Object).Count) child OUs"
         }
         catch {
-            Write-Log "Error calculating group statistics: $_" -Type Error
-            Write-Log "Statistics error details: $($_.Exception.Message)" -Type Error
-            Write-Log "Statistics stack trace: $($_.ScriptStackTrace)" -Type Error
+            Write-Log "Error processing OU statistics: $_" -Type Error
+            Write-Log "OU statistics error details: $($_.Exception.Message)" -Type Error
+            Write-Log "OU statistics stack trace: $($_.ScriptStackTrace)" -Type Error
         }
 
         Write-Log "Step 4: Processing OU statistics..."
@@ -737,7 +819,6 @@ function New-HTMLReport {
             Write-Log "Processing age and size analysis data..."
             
             # Oldest Group calculation
-            $oldestGroup = $Groups | Sort-Object Created | Select-Object -First 1
             $oldestGroupData = @{
                 Name = if ($oldestGroup) { $oldestGroup.Name } else { "N/A" }
                 Created = if ($oldestGroup) { $oldestGroup.Created.ToString('MMMM d, yyyy') } else { "N/A" }
@@ -745,7 +826,6 @@ function New-HTMLReport {
             Write-Log "Oldest group: $($oldestGroupData.Name), Created: $($oldestGroupData.Created)"
 
             # Largest Group calculation
-            $largestGroup = $Groups | Sort-Object TotalMembers -Descending | Select-Object -First 1
             $largestGroupData = @{
                 Name = if ($largestGroup) { $largestGroup.Name } else { "N/A" }
                 Members = if ($largestGroup) { $largestGroup.TotalMembers } else { 0 }
@@ -753,7 +833,6 @@ function New-HTMLReport {
             Write-Log "Largest group: $($largestGroupData.Name), Members: $($largestGroupData.Members)"
 
             # Largest OU calculation
-            $largestOU = $ouStats.GetEnumerator() | Sort-Object { $_.Value.GroupCount } -Descending | Select-Object -First 1
             $largestOUData = @{
                 Name = if ($largestOU) { ($largestOU.Key -split ',')[0] -replace '^OU=' } else { "N/A" }
                 Groups = if ($largestOU) { $largestOU.Value.GroupCount } else { 0 }
@@ -989,6 +1068,20 @@ function Initialize-ReportData {
             MAX_NESTING_DEPTH = $maxNestingDepth
             GROUP_CATEGORIES = "Security: $totalGroups"
             SCOPE_DISTRIBUTION = "Global: $totalGroups"
+            
+            # Age and Size Analysis
+            OLDEST_GROUP = @{
+                Name = $oldestGroup.Name
+                Created = $oldestGroup.Created.ToString('MMMM d, yyyy')
+            }
+            LARGEST_GROUP = @{
+                Name = $largestGroup.Name
+                Members = $largestGroup.TotalMembers
+            }
+            LARGEST_OU = @{
+                Name = ($largestOU.Key -split ',')[0] -replace '^OU='
+                Groups = $largestOU.Value.GroupCount
+            }
             
             # Full Data Sets
             GROUPS = $Groups
