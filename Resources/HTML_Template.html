@@ -437,8 +437,9 @@
         }
 
         .nested-warning {
-            color: var(--warning-color);
+            color: var(--critical-color);
             margin-bottom: 8px;
+            font-weight: bold;
         }
 
         /* Nested Groups Expansion Styles */
@@ -1999,17 +2000,18 @@
                     </div>
                     <h3 class="metric-title">User Distribution</h3>
                 </div>
-                <div class="metric-grid">
+                <div class="metric-grid" style="grid-template-columns: repeat(3, 1fr);">
                     <div class="metric-item">
                         <span class="metric-label">Total Users</span>
                         <span class="metric-value" data-metric="TOTAL_MEMBERS"></span>
                     </div>
                     <div class="metric-item">
-                        <span class="metric-label">User Status</span>
-                        <span class="metric-value">
-                            <span data-metric="ACTIVE_MEMBERS"></span> enabled /
-                            <span data-metric="DISABLED_USERS"></span> disabled
-                        </span>
+                        <span class="metric-label">Enabled Users</span>
+                        <span class="metric-value" data-metric="ACTIVE_MEMBERS"></span>
+                    </div>
+                    <div class="metric-item">
+                        <span class="metric-label">Disabled Users</span>
+                        <span class="metric-value" data-metric="DISABLED_USERS"></span>
                     </div>
                 </div>
                 <div class="metric-trend">
@@ -2081,7 +2083,6 @@
                             <span class="structure-value" data-metric="NESTED_GROUPS"></span>
                             <span class="structure-info">
                                 (<span data-metric="NESTED_GROUPS_PERCENT"></span>% of total)
-                                Max Depth: <span data-metric="MAX_NESTING_DEPTH"></span>
                             </span>
                         </div>
                     </div>

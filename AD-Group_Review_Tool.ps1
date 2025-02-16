@@ -346,6 +346,8 @@ function Get-GroupDetails {
                 DisabledPercentage = 0
                 NestedGroupCount = 0
                 MaxNestingDepth = 0
+                EnabledUserGuids = New-Object System.Collections.Generic.HashSet[string]
+                DisabledUserGuids = New-Object System.Collections.Generic.HashSet[string]
             }
         }
         
@@ -458,15 +460,19 @@ function Get-GroupDetails {
                     
                     # Update OU statistics with user counts
                     try {
-                        # Get all users in this OU
-                        $ouUsers = Get-ADUser -LDAPFilter "(memberOf=$($group.DistinguishedName))" -Properties Enabled,ObjectGUID -ResultSetSize $null -ErrorAction Stop
+                        # Special handling for different OU types
+                        if ($ou -like "*OU=Disabled Users,*") {
+                            # Get all users directly in the Disabled Users OU
+                            $ouUsers = Get-ADUser -Filter * -SearchBase $ou -Properties Enabled,ObjectGUID -ResultSetSize $null -ErrorAction Stop
+                        } elseif ($ou -like "*OU=Users,*") {
+                            # For Users OUs, get all users directly in the OU
+                            $ouUsers = Get-ADUser -Filter * -SearchBase $ou -Properties Enabled,ObjectGUID -ResultSetSize $null -ErrorAction Stop
+                        } else {
+                            # For other OUs, get users through group membership
+                            $ouUsers = Get-ADUser -LDAPFilter "(memberOf=$($group.DistinguishedName))" -Properties Enabled,ObjectGUID -ResultSetSize $null -ErrorAction Stop
+                        }
+
                         if ($ouUsers) {
-                            # Initialize HashSets for this OU if they don't exist
-                            if (-not $script:OUStats[$ou].EnabledUserGuids) {
-                                $script:OUStats[$ou].EnabledUserGuids = New-Object System.Collections.Generic.HashSet[string]
-                                $script:OUStats[$ou].DisabledUserGuids = New-Object System.Collections.Generic.HashSet[string]
-                            }
-                            
                             # Process each user and update counts using GUIDs to ensure uniqueness
                             foreach ($user in @($ouUsers)) {
                                 if ($null -ne $user) {
@@ -551,7 +557,7 @@ function Get-GroupDetails {
 
                     # Add nested group warning to health issues if present
                     if ($groupObj.HasNestedGroups) {
-                        $nestedWarning = "Contains nested groups ($($groupObj.GroupMembers) groups) - Click + for details"
+                        $nestedWarning = "Contains nested groups ($($groupObj.GroupMembers) groups)"
                         if ($groupObj.HealthIssues -isnot [System.Collections.ArrayList]) {
                             $groupObj.HealthIssues = [System.Collections.ArrayList]@($groupObj.HealthIssues)
                         }
