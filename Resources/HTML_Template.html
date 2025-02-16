@@ -435,9 +435,8 @@
         td > div {
             margin-bottom: 4px;
         }
-
         .nested-warning {
-            color: var(--critical-color);
+            color: #FF0000;
             margin-bottom: 8px;
             font-weight: bold;
         }
@@ -1558,6 +1557,20 @@
                         const dist = typeof templateData[metric] === 'string' ? 
                             JSON.parse(templateData[metric]) : templateData[metric];
                         element.textContent = `Enabled: ${dist.Enabled}, Disabled: ${dist.Disabled}`;
+                    } else if (metric === 'GROUP_CATEGORIES') {
+                        // Format group categories with bullet points
+                        const categories = templateData[metric];
+                        if (categories) {
+                            element.textContent = categories;
+                            console.log('Group Categories:', categories); // Debug log
+                        }
+                    } else if (metric === 'SCOPE_DISTRIBUTION') {
+                        // Format scope distribution with bullet points
+                        const scopes = templateData[metric];
+                        if (scopes) {
+                            element.textContent = scopes;
+                            console.log('Scope Distribution:', scopes); // Debug log
+                        }
                     } else if (metric.includes('.')) {
                         // Handle nested properties (e.g., 'OLDEST_GROUP.Name')
                         const [parent, child] = metric.split('.');
@@ -1725,9 +1738,25 @@
 
         function populateOUStats() {
             const tbody = document.querySelector('.ou-stats-table tbody');
+            if (!tbody || !templateData.OU_STATS) {
+                console.error('Could not find tbody or OU_STATS data');
+                return;
+            }
             tbody.innerHTML = '';
             
-            templateData.OU_STATS.forEach(stat => {
+            // Ensure OU_STATS is an array
+            const ouStats = Array.isArray(templateData.OU_STATS) ? 
+                templateData.OU_STATS : 
+                Object.values(templateData.OU_STATS);
+            
+            if (!ouStats || ouStats.length === 0) {
+                console.error('No OU statistics data available');
+                return;
+            }
+
+            ouStats.forEach(stat => {
+                if (!stat) return; // Skip null/undefined entries
+                
                 const row = document.createElement('tr');
                 
                 // Add classes based on thresholds
@@ -1737,14 +1766,14 @@
                                    stat.MaxNestingDepth > 5 ? 'warning-text' : '';
                 
                 row.innerHTML = `
-                    <td>${escapeHtml(stat.CurrentOU)}</td>
-                    <td class="parent-ou">${escapeHtml(stat.ParentOU)}</td>
-                    <td class="members-cell">${stat.GroupCount}</td>
-                    <td class="members-cell">${stat.EnabledMembers} enabled / ${stat.DisabledMembers} disabled</td>
-                    <td class="members-cell">${stat.TotalMembers}</td>
-                    <td class="members-cell ${disabledClass}" data-value="${stat.DisabledPercentage}">${stat.DisabledPercentage}%</td>
-                    <td class="members-cell">${stat.NestedGroupCount}</td>
-                    <td class="members-cell ${nestingClass}">${stat.MaxNestingDepth}</td>
+                    <td>${escapeHtml(stat.CurrentOU || '')}</td>
+                    <td class="parent-ou">${escapeHtml(stat.ParentOU || '')}</td>
+                    <td class="members-cell">${stat.GroupCount || 0}</td>
+                    <td class="members-cell">${stat.EnabledMembers || 0} enabled / ${stat.DisabledMembers || 0} disabled</td>
+                    <td class="members-cell">${stat.TotalMembers || 0}</td>
+                    <td class="members-cell ${disabledClass}" data-value="${stat.DisabledPercentage || 0}">${stat.DisabledPercentage || 0}%</td>
+                    <td class="members-cell">${stat.NestedGroupCount || 0}</td>
+                    <td class="members-cell ${nestingClass}">${stat.MaxNestingDepth || 0}</td>
                 `;
                 
                 tbody.appendChild(row);
@@ -1753,11 +1782,32 @@
         
         function populateGroupTable() {
             const tbody = document.querySelector('.group-table tbody');
+            if (!tbody || !templateData.GROUPS) {
+                console.error('Could not find tbody or GROUPS data');
+                return;
+            }
             tbody.innerHTML = '';
             
-            templateData.GROUPS.forEach(group => {
+            // Ensure GROUPS is an array
+            const groups = Array.isArray(templateData.GROUPS) ? 
+                templateData.GROUPS : 
+                Object.values(templateData.GROUPS);
+            
+            groups.forEach(group => {
+                // Ensure arrays are properly handled
+                group.HealthIssues = Array.isArray(group.HealthIssues) ? 
+                    group.HealthIssues : 
+                    (group.HealthIssues ? [group.HealthIssues] : []);
+                group.ParentGroups = Array.isArray(group.ParentGroups) ? 
+                    group.ParentGroups : 
+                    (group.ParentGroups ? [group.ParentGroups] : []);
+                group.NestedGroups = Array.isArray(group.NestedGroups) ? 
+                    group.NestedGroups : 
+                    (group.NestedGroups ? [group.NestedGroups] : []);
+
                 // Create main row
                 const mainRow = document.createElement('tr');
+                mainRow.setAttribute('data-group-id', escapeHtml(group.ID || group.DN));
                 mainRow.innerHTML = `
                     <td>
                         <button class="group-expand-btn" onclick="toggleGroupDetails(this, '${escapeHtml(group.ID)}')">+</button>
@@ -2093,9 +2143,17 @@
                             </svg>
                         </div>
                         <div class="structure-details">
-                            <span class="structure-label">Group Categories</span>
-                            <span class="structure-value" data-metric="GROUP_CATEGORIES"></span>
-                            <span class="structure-info" data-metric="SCOPE_DISTRIBUTION"></span>
+                            <span class="structure-label">Group Distribution</span>
+                            <div class="structure-value" style="margin-top: 8px; font-size: 14px;">
+                                <div style="margin-bottom: 8px;">
+                                    <strong>Categories:</strong>
+                                    <div data-metric="GROUP_CATEGORIES" style="margin-top: 4px; color: #4a5568;"></div>
+                                </div>
+                                <div>
+                                    <strong>Scopes:</strong>
+                                    <div data-metric="SCOPE_DISTRIBUTION" style="margin-top: 4px; color: #4a5568;"></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

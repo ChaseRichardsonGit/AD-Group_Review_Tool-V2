@@ -170,8 +170,20 @@
                                                     Tag="{Binding DistinguishedName}"
                                                     ToolTip="{Binding Description}"
                                                     IsChecked="False"
+                                                    IsEnabled="{Binding IsSelectable}"
                                                     x:Name="ouCheckBox"
-                                                    Foreground="#4A5568"/>
+                                                    Foreground="#4A5568">
+                                                <CheckBox.Style>
+                                                    <Style TargetType="CheckBox">
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsSelectable}" Value="False">
+                                                                <Setter Property="Opacity" Value="0.5"/>
+                                                                <Setter Property="ToolTip" Value="Cannot select parent OU with child OUs"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </CheckBox.Style>
+                                            </CheckBox>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>

@@ -227,30 +227,79 @@ function Get-ADOUList {
     Write-Log "Getting list of OUs..."
     try {
         $domain = Get-ADDomain
-        $ous = Get-ADOrganizationalUnit -Filter * -Properties Name, DistinguishedName -SearchBase $domain.DistinguishedName |
-            ForEach-Object {
-                # Get group count for this OU
-                $groupCount = @(Get-ADGroup -Filter * -SearchBase $_.DistinguishedName -SearchScope OneLevel).Count
-                
-                # Format the OU path for display - replace DC parts and format OU path with arrows
-                $ouPath = $_.DistinguishedName
-                $ouPath = $ouPath -replace '(,DC=[\w-]+)+$', ''  # Remove DC components
-                $ouPath = $ouPath -replace ',OU=', ' -> '         # Replace OU separators with arrows
-                $ouPath = $ouPath -replace '^OU=', ''            # Remove leading OU=
-                
-                [PSCustomObject]@{
-                    Name = "$ouPath ($groupCount groups)"
-                    DistinguishedName = $_.DistinguishedName
-                    Description = "Full Path: $($_.DistinguishedName)"
-                    GroupCount = $groupCount
-                }
-            } | Sort-Object { $_['GroupCount'] } -Descending
+        $allOUs = Get-ADOrganizationalUnit -Filter * -Properties Name, DistinguishedName -SearchBase $domain.DistinguishedName
+        
+        # Create a hashtable to track child OUs
+        $childOUs = @{}
+        $parentOUs = @{}
+        
+        # First pass - identify parent-child relationships
+        foreach ($ou in $allOUs) {
+            $parentDN = ($ou.DistinguishedName -split ',', 2)[1]
+            if ($parentDN -match '^OU=') {
+                $childOUs[$ou.DistinguishedName] = $true
+                $parentOUs[$parentDN] = $true
+            }
+        }
+        
+        # Second pass - create OU objects
+        $ous = $allOUs | ForEach-Object {
+            # Get group count for this OU
+            $groupCount = @(Get-ADGroup -Filter * -SearchBase $_.DistinguishedName -SearchScope OneLevel).Count
+            
+            # Format the OU path for display
+            $ouPath = $_.DistinguishedName
+            $ouPath = $ouPath -replace '(,DC=[\w-]+)+$', ''
+            $ouPath = $ouPath -replace ',OU=', ' -> '
+            $ouPath = $ouPath -replace '^OU=', ''
+            
+            # Determine if this is a parent OU with children
+            $isParentWithChildren = $parentOUs.ContainsKey($_.DistinguishedName) -and -not $childOUs.ContainsKey($_.DistinguishedName)
+            
+            [PSCustomObject]@{
+                Name = "$ouPath ($groupCount groups)"
+                DistinguishedName = $_.DistinguishedName
+                Description = "Full Path: $($_.DistinguishedName)"
+                GroupCount = $groupCount
+                IsSelectable = -not $isParentWithChildren
+            }
+        } | Sort-Object { $_['GroupCount'] } -Descending
         
         return $ous
     } 
     catch {
         Write-Log "Error getting OU list: $_"
         return @()
+    }
+}
+
+# Helper function to safely convert AD properties to arrays
+function ConvertTo-SafeArray {
+    param(
+        [Parameter(Mandatory=$false)]
+        $InputObject
+    )
+    
+    if ($null -eq $InputObject) { return @() }
+    
+    try {
+        # Handle different types of input
+        if ($InputObject -is [Array]) {
+            return $InputObject
+        }
+        elseif ($InputObject.GetType().FullName -eq 'Microsoft.ActiveDirectory.Management.ADPropertyValueCollection') {
+            return [array]($InputObject)
+        }
+        elseif ($InputObject -is [String]) {
+            return @($InputObject)
+        }
+        else {
+            return @($InputObject)
+        }
+    }
+    catch {
+        Write-Log "Error in ConvertTo-SafeArray: $_" -NoConsole
+        return @($InputObject)
     }
 }
 
@@ -278,14 +327,8 @@ function Get-NestedGroupMembership {
         $group = Get-ADGroup -Identity $GroupDN -Properties memberOf
         
         if ($null -ne $group.memberOf) {
-            # Convert memberOf to array safely based on its type
-            $memberOfGroups = if ($group.memberOf -is [Microsoft.ActiveDirectory.Management.ADPropertyValueCollection]) {
-                [array]($group.memberOf)
-            } elseif ($group.memberOf -is [string]) {
-                @($group.memberOf)
-            } else {
-                [array]($group.memberOf)
-            }
+            # Use the helper function to safely convert to array
+            $memberOfGroups = ConvertTo-SafeArray -InputObject $group.memberOf
             
             foreach ($memberOfGroup in $memberOfGroups) {
                 if ($AllNestedGroups.Add($memberOfGroup)) {
@@ -321,6 +364,17 @@ function Get-GroupDetails {
         # Create hashtable to store OU statistics
         $script:OUStats = @{}
         
+        # Track group categories
+        $groupCategories = @{
+            'Security Groups' = 0
+            'Distribution Groups' = 0
+        }
+        $groupScopes = @{
+            'DomainLocal' = 0
+            'Global' = 0
+            'Universal' = 0
+        }
+        
         # First pass - count total groups and track unique groups by DN
         $uniqueGroups = @{}
         foreach($ou in $SelectedOUs) {
@@ -334,6 +388,21 @@ function Get-GroupDetails {
                 if (-not $uniqueGroups.ContainsKey($group.DistinguishedName)) {
                     $uniqueGroups[$group.DistinguishedName] = $true
                     $totalGroups++
+                    
+                    # Count group categories
+                    $category = if ($group.groupCategory -eq 'Security') {
+                        'Security Groups'
+                    } else {
+                        'Distribution Groups'
+                    }
+                    $groupCategories[$category]++
+                    
+                    # Count group scopes
+                    $scope = $group.groupScope.ToString()
+                    if (-not $groupScopes.ContainsKey($scope)) {
+                        $groupScopes[$scope] = 0
+                    }
+                    $groupScopes[$scope]++
                 }
             }
             
@@ -352,6 +421,19 @@ function Get-GroupDetails {
         }
         
         Write-Log "Total unique groups to process: $totalGroups"
+        
+        # Format group category and scope distribution strings with counts
+        $categoryStr = ($groupCategories.GetEnumerator() | Where-Object { $_.Value -gt 0 } | Sort-Object Name | ForEach-Object { 
+            "$($_.Value) $($_.Key)"
+        }) -join ' • '
+        
+        Write-Log "Group Categories: $categoryStr"
+        
+        $scopeStr = ($groupScopes.GetEnumerator() | Where-Object { $_.Value -gt 0 } | Sort-Object Name | ForEach-Object { 
+            "$($_.Value) $($_.Key)"
+        }) -join ' • '
+        
+        Write-Log "Group Scopes: $scopeStr"
         
         # Track age and size metrics
         $script:oldestGroup = $null
@@ -385,11 +467,7 @@ function Get-GroupDetails {
                 try {
                     # Get nested group information
                     $nestedGroups = Get-NestedGroupMembership -GroupDN $group.DistinguishedName
-                    $nestingDepth = if ($nestedGroups -is [Microsoft.ActiveDirectory.Management.ADPropertyValueCollection]) {
-                        ([array]$nestedGroups).Count
-                    } else {
-                        if ($null -eq $nestedGroups) { 0 } else { @($nestedGroups).Count }
-                    }
+                    $nestingDepth = if ($null -eq $nestedGroups) { 0 } else { @(ConvertTo-SafeArray -InputObject $nestedGroups).Count }
                     
                     # Initialize member counts
                     $userMembers = 0
@@ -406,10 +484,11 @@ function Get-GroupDetails {
                             # Get all user members and their enabled status
                             $users = Get-ADUser -LDAPFilter "(memberOf=$($group.DistinguishedName))" -Properties Enabled,ObjectGUID -ResultSetSize $null -ErrorAction Stop
                             if ($users) {
-                                $userMembers = if ($users -is [array]) { $users.Count } else { 1 }
+                                $users = ConvertTo-SafeArray -InputObject $users
+                                $userMembers = $users.Count
                                 
                                 # Process each user and update counts
-                                foreach ($user in @($users)) {
+                                foreach ($user in $users) {
                                     if ($null -ne $user) {
                                         if ($user.Enabled) {
                                             $enabledMembers++
@@ -464,8 +543,9 @@ function Get-GroupDetails {
                         $ouUsers = Get-ADUser -Filter * -SearchBase $ou -Properties Enabled,ObjectGUID -ResultSetSize $null -ErrorAction Stop
                         
                         if ($ouUsers) {
+                            $ouUsers = ConvertTo-SafeArray -InputObject $ouUsers
                             # Process each user and update counts using GUIDs to ensure uniqueness
-                            foreach ($user in @($ouUsers)) {
+                            foreach ($user in $ouUsers) {
                                 if ($null -ne $user) {
                                     if ($user.Enabled) {
                                         [void]$script:OUStats[$ou].EnabledUserGuids.Add($user.ObjectGUID.ToString())
@@ -481,7 +561,8 @@ function Get-GroupDetails {
                             $groupUsers = Get-ADUser -LDAPFilter "(memberOf=$($group.DistinguishedName))" -Properties Enabled,ObjectGUID -ResultSetSize $null -ErrorAction Stop
                             
                             if ($groupUsers) {
-                                foreach ($user in @($groupUsers)) {
+                                $groupUsers = ConvertTo-SafeArray -InputObject $groupUsers
+                                foreach ($user in $groupUsers) {
                                     if ($null -ne $user) {
                                         if ($user.Enabled) {
                                             [void]$script:OUStats[$ou].EnabledUserGuids.Add($user.ObjectGUID.ToString())
@@ -540,22 +621,18 @@ function Get-GroupDetails {
                         Category = $group.groupCategory
                         Scope = $group.groupScope
                         NestedInGroupCount = if ($null -ne $group.memberOf) {
-                            if ($group.memberOf -is [Microsoft.ActiveDirectory.Management.ADPropertyValueCollection]) {
-                                [array]($group.memberOf).Count
-                            } else {
-                                if ($group.memberOf -is [string]) { 1 } else { @($group.memberOf).Count }
-                            }
+                            @(ConvertTo-SafeArray -InputObject $group.memberOf).Count
                         } else { 0 }
                         HasNestedGroups = ($groupMembers -gt 0)
                         DN = $group.DistinguishedName
                         OU = ($group.DistinguishedName -split ',',2)[1]
                         SamAccountName = $group.sAMAccountName
                         # Add parent group names - handle ADPropertyValueCollection properly
-                        ParentGroups = [array](Get-ADGroup -LDAPFilter "(member=$($group.DistinguishedName))" -Properties name | 
-                            Select-Object -ExpandProperty name | Where-Object { $_ })
+                        ParentGroups = @(ConvertTo-SafeArray -InputObject (Get-ADGroup -LDAPFilter "(member=$($group.DistinguishedName))" -Properties name | 
+                            Select-Object -ExpandProperty name | Where-Object { $_ }))
                         # Add nested group names - handle ADPropertyValueCollection properly
-                        NestedGroups = [array](Get-ADGroup -LDAPFilter "(memberOf=$($group.DistinguishedName))" -Properties name | 
-                            Select-Object -ExpandProperty name | Where-Object { $_ })
+                        NestedGroups = @(ConvertTo-SafeArray -InputObject (Get-ADGroup -LDAPFilter "(memberOf=$($group.DistinguishedName))" -Properties name | 
+                            Select-Object -ExpandProperty name | Where-Object { $_ }))
                     }
                     
                     # Add health check
@@ -742,12 +819,13 @@ function New-HTMLReport {
 
         Write-Log "Step 4: Processing OU statistics..."
         try {
-            Write-Log "Processing OU statistics from $script:OUStats..."
-            Write-Log "Number of OUs to process: $($script:OUStats.Count)"
+            Write-Log "Processing OU statistics from $($script:OUStats.Count) OUs..."
             
-            $ouStats = $script:OUStats.GetEnumerator() | ForEach-Object {
-                $fullDN = $_.Key
-                $stats = $_.Value
+            # Convert hashtable to array of PSObjects for PowerShell 5.1 compatibility
+            $ouStats = @()
+            foreach ($ouEntry in $script:OUStats.GetEnumerator()) {
+                $fullDN = $ouEntry.Key
+                $stats = $ouEntry.Value
                 Write-Log "Processing OU: $fullDN" -NoConsole
                 
                 # Split DN and get OU parts
@@ -769,22 +847,39 @@ function New-HTMLReport {
                         [math]::Round(($stats.DisabledMembers / $stats.TotalMembers) * 100, 1)
                     } else { 0 }
                     
-                    @{
+                    # Create PSObject for better PowerShell 5.1 compatibility
+                    $ouObject = New-Object PSObject -Property @{
                         CurrentOU = $currentOU
                         ParentOU = $parentOU
                         FullDN = $fullDN
-                        GroupCount = $stats.GroupCount
-                        EnabledMembers = $stats.EnabledMembers
-                        DisabledMembers = $stats.DisabledMembers
-                        TotalMembers = ($stats.EnabledMembers + $stats.DisabledMembers)
-                        DisabledPercentage = $disabledPercentage
-                        NestedGroupCount = $stats.NestedGroupCount
-                        MaxNestingDepth = $stats.MaxNestingDepth
+                        GroupCount = [int]($stats.GroupCount)
+                        EnabledMembers = [int]($stats.EnabledMembers)
+                        DisabledMembers = [int]($stats.DisabledMembers)
+                        TotalMembers = [int]($stats.EnabledMembers + $stats.DisabledMembers)
+                        DisabledPercentage = [double]$disabledPercentage
+                        NestedGroupCount = [int]($stats.NestedGroupCount)
+                        MaxNestingDepth = [int]($stats.MaxNestingDepth)
                     }
+                    
+                    $ouStats += $ouObject
                 }
-            } | Where-Object { $_ -ne $null } | Sort-Object { $_.GroupCount } -Descending
+            }
             
-            Write-Log "Processed $(($ouStats | Measure-Object).Count) child OUs"
+            # Sort OUs by group count
+            $ouStats = @($ouStats | Sort-Object GroupCount -Descending)
+            
+            Write-Log "Processed $($ouStats.Count) child OUs"
+            
+            # Ensure ouStats is not null before using it in template data
+            if ($null -eq $ouStats) {
+                Write-Log "Warning: ouStats is null, initializing empty array" -Type Warning
+                $ouStats = @()
+            }
+            
+            # Convert to array if it's not already (PowerShell 5.1 compatibility)
+            $ouStats = @($ouStats)
+            
+            Write-Log "Final OU stats count: $($ouStats.Count)"
         }
         catch {
             Write-Log "Error processing OU statistics: $_" -Type Error
@@ -931,6 +1026,21 @@ function New-HTMLReport {
                 [Math]::Round(($disabledMembers / $totalMembers) * 100, 1)
             } else { 0 }
 
+            # Add group distribution data
+            $groupDistribution = @{
+                Categories = $groupCategories
+                Scopes = $groupScopes
+            }
+
+            # Calculate member percentages
+            $activeMembersPercent = if ($totalMembers -gt 0) {
+                [Math]::Round(($activeMembers / $totalMembers) * 100, 1)
+            } else { 0 }
+            
+            $disabledMembersPercent = if ($totalMembers -gt 0) {
+                [Math]::Round(($disabledMembers / $totalMembers) * 100, 1)
+            } else { 0 }
+
             $templateData = @{
                 # Report Metadata
                 REPORT_DATE = "Report Generated: $(Get-Date -Format 'MMMM d, yyyy  •  h:mm tt')"
@@ -971,8 +1081,11 @@ function New-HTMLReport {
                 NESTED_GROUPS = $nestedGroups
                 NESTED_GROUPS_PERCENT = $nestedGroupsPercent
                 MAX_NESTING_DEPTH = ($Groups | Measure-Object -Property NestingDepth -Maximum).Maximum
-                GROUP_CATEGORIES = "Security: $totalGroups"
-                SCOPE_DISTRIBUTION = "Global: $totalGroups"
+                GROUP_CATEGORIES = $categoryStr
+                SCOPE_DISTRIBUTION = $scopeStr
+                GROUP_DISTRIBUTION = $groupDistribution
+                GROUP_CATEGORIES_DATA = $groupCategories
+                GROUP_SCOPES_DATA = $groupScopes
                 
                 # Age and Size Analysis
                 OLDEST_GROUP = $oldestGroupData
@@ -1112,8 +1225,8 @@ function Initialize-ReportData {
         
         # Member Statistics
         $totalMembers = ($Groups | Measure-Object -Property TotalMembers -Sum).Sum
-        $disabledUsers = ($Groups | Measure-Object -Property DisabledUsers -Sum).Sum
-        $enabledUsers = ($Groups | Measure-Object -Property EnabledUsers -Sum).Sum
+        $disabledMembers = ($Groups | Measure-Object -Property DisabledUsers -Sum).Sum
+        $enabledMembers = ($Groups | Measure-Object -Property EnabledUsers -Sum).Sum
         
         # Management Status
         $noManager = ($Groups | Where-Object { $null -eq $_.Manager }).Count
@@ -1145,10 +1258,10 @@ function Initialize-ReportData {
             
             # User Distribution
             TOTAL_MEMBERS = $totalMembers
-            DISABLED_USERS = $disabledUsers
+            DISABLED_USERS = $disabledMembers
             USER_DISTRIBUTION = @{
-                Enabled = $enabledUsers
-                Disabled = $disabledUsers
+                Enabled = $enabledMembers
+                Disabled = $disabledMembers
             } | ConvertTo-Json
             
             # Management Status
@@ -1160,8 +1273,8 @@ function Initialize-ReportData {
             # Group Structure
             NESTED_GROUPS = $nestedGroups
             MAX_NESTING_DEPTH = $maxNestingDepth
-            GROUP_CATEGORIES = "Security: $totalGroups"
-            SCOPE_DISTRIBUTION = "Global: $totalGroups"
+            GROUP_CATEGORIES = $categoryStr
+            SCOPE_DISTRIBUTION = $scopeStr
             
             # Age and Size Analysis
             OLDEST_GROUP = @{
